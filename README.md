@@ -10,7 +10,7 @@ It is extracted from the Chef LXC cookbook, so poke around there
 
 require 'elecksee/lxc'
 
-lxc = Elecksee::Lxc.new('my-container')
+lxc = Lxc.new('my-container')
 p lxc.info
 ```
 
