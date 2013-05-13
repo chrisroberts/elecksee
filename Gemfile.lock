@@ -1,0 +1,18 @@
+PATH
+  remote: .
+  specs:
+    elecksee (1.0.0)
+      mixlib-shellout
+      net-ssh
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    mixlib-shellout (1.1.0)
+    net-ssh (2.6.7)
+
+PLATFORMS
+  ruby
+
+DEPENDENCIES
+  elecksee!
