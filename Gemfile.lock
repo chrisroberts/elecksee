@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    elecksee (1.0.1)
+    elecksee (1.0.2)
       mixlib-shellout
       net-ssh
 
