@@ -39,7 +39,7 @@ class Lxc
     option :daemon, '-d', :boolean, :desc => 'Run as a daemon'
     option :bind, '-b', :string, :desc => 'Bind provided directory (non-ephemeral)'
     option :user, '-u', :string, :desc => 'Deprecated: Provided for compatibility'
-    option :ssh_key, '-S', :string, :aliases => 'ssh-key', :desc => 'Deprecated: Provided for compatibility'
+    option :ssh_key, '-S', :string, :default => '/opt/hw-lxc-config/id_rsa', :aliases => 'ssh-key', :desc => 'Deprecated: Provided for compatibility'
     option :lxc_dir, '-L', :string, :default => '/var/lib/lxc', :aliases => 'lxc-dir', :desc => 'Directory of LXC store'
     option :tmp_dir, '-T', :string, :default => '/tmp/lxc/ephemerals', :aliases => 'tmp-dir', :desc => 'Directory of ephemeral temp files'
 
@@ -67,29 +67,35 @@ class Lxc
         Signal.trap(sig){ cleanup }
       end
     end
+
+    def cli_output
+      if(cli)
+        puts "New ephemeral container started. (#{name})"
+        puts "    - Connect using: sudo ssh -i #{ssh_key} root@#{lxc.container_ip(10)}"
+      end
+    end
     
     def start!(*args)
       register_traps
       setup
-      if(cli)
-        puts 'New ephemeral container started.'
-        puts "    - Connect using: sudo lxc-console -n #{name}"
-      end
       if(daemon)
         if(args.include?(:fork))
           fork do
             lxc.start
+            cli_output
             lxc.wait_for_state(:stopped)
             cleanup
           end
         else
           Process.daemon
           lxc.start
+          cli_output
           lxc.wait_for_state(:stopped)
           cleanup
         end
       else
         lxc.start
+        cli_output
         lxc.wait_for_state(:stopped)
         cleanup
       end
