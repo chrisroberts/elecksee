@@ -1,5 +1,60 @@
 #!/usr/bin/env ruby
 
-require 'elecksee/awesome'
+require 'elecksee/ephemeral'
+require 'getoptlong'
 
-Elecksee::Awesome.run!
+require 'pp'
+
+opts = Lxc::Ephemeral.options.map do |k,v|
+  res = [
+    ["--#{k}", v[:short], v[:type] == :boolean ? GetoptLong::NO_ARGUMENT : GetoptLong::REQUIRED_ARGUMENT]
+  ]
+  if(v[:aliases])
+    Array(v[:aliases]).each do |al|
+      res << ["--#{al}", v[:type] == :boolean ? GetoptLong::NO_ARGUMENT : GetoptLong::REQUIRED_ARGUMENT]
+    end
+  end
+  res
+end.flatten(1) << ['--help', '-h', GetoptLong::NO_ARGUMENT]
+
+opts = GetoptLong.new(*opts)
+
+config = {}
+opts.each do |opt,arg|
+  case opt
+  when '--help'
+    puts 'Usage: lxc-awesome-ephemeral [OPTS] -o NAME'
+    output = []
+    Lxc::Ephemeral.options.map do |k,v|
+      option = "--#{k} #{v[:short]}"
+      unless(v[:type] == :boolean)
+        option << ' VAL'
+      end
+      output << {:opt => option, :desc => v[:desc], :alias => v[:aliases]}
+    end
+    opt_len = output.map{|o| o[:opt].length}.max + 2
+    output.each do |option|
+      puts "  #{option[:opt]}:#{' ' * (opt_len - option[:opt].length)}#{option[:desc]}"
+      Array(option[:alias]).each do |a|
+        puts "      --#{a}"
+      end
+    end
+    exit -1
+  when '--version'
+  else
+    key = opt.sub('--', '').to_sym
+    opt_conf = Lxc::Ephemeral.options[key]
+    case opt_conf[:type]
+    when :boolean
+      val = true
+    when :integer
+      val = arg.to_i
+    else
+      val = arg
+    end
+  end
+  config[key] = val
+end
+
+ephemeral = Lxc::Ephemeral.new(config.merge(:cli => true))
+ephemeral.start!
