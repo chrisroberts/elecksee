@@ -114,7 +114,7 @@ class Lxc
 
     def configure!(args)
       self.class.options.each do |name, opts|
-        argv = args.detect{|k,v| (Array(opts[:aliases]) + Array(opts[:short]) + [name]).include?(k)}
+        argv = args.detect{|k,v| (Array(opts[:aliases]) + Array(opts[:short]) + [name]).include?(k.to_sym)}
         argv = argv.last if argv
         argv ||= opts[:default]
         if(argv)
@@ -305,7 +305,7 @@ EOF
           else
             raise "Invalid overlay type provided: #{overlay_type}"
           end
-          command(cmd)
+          command(cmd, :sudo => true)
           true
         end
       end
@@ -316,7 +316,7 @@ EOF
       
       def unmount
         if(mounted?)
-          command("umount #{target}")
+          command("umount #{target}", :sudo => true)
           true
         end
       end
@@ -406,14 +406,14 @@ EOF
       
       def mount
         unless(mounted?)
-          command("mount -t #{fs_type}#{mount_options} #{device_path} #{mount_path}")
+          command("mount -t #{fs_type}#{mount_options} #{device_path} #{mount_path}", :sudo => true)
           true
         end
       end
 
       def unmount
         if(mounted?)
-          command("umount #{mount_path}")
+          command("umount #{mount_path}", :sudo => true)
           true
         end
       end
