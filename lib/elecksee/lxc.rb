@@ -5,12 +5,17 @@ require 'tmpdir'
 class Lxc
   class CommandFailed < StandardError
   end
-
+  
   module Helpers
+
+    def sudo
+      Lxc.sudo
+    end
     
     # Simple helper to shell out
     def run_command(cmd, args={})
       retries = args[:allow_failure_retry].to_i
+      cmd = [sudo, cmd].join(' ') if args[:sudo]
       begin
         shlout = Mixlib::ShellOut.new(cmd, 
           :logger => defined?(Chef) ? Chef::Log.logger : log,
@@ -87,10 +92,6 @@ class Lxc
     attr_accessor :use_sudo
     attr_accessor :base_path
 
-    def base_path
-      @base_path || '/var/lib/lxc'
-    end
-
     def sudo
       case use_sudo
       when TrueClass
@@ -98,6 +99,10 @@ class Lxc
       when String
         "#{use_sudo} "
       end
+    end
+    
+    def base_path
+      @base_path || '/var/lib/lxc'
     end
         
     # List running containers
@@ -294,10 +299,6 @@ class Lxc
     end
   end
 
-  def sudo
-    self.class.sudo
-  end
-    
   # Full path to container
   def container_path
     Pathname.new(@base_path).join(name)
