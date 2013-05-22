@@ -1,7 +1,13 @@
-require File.expand_path(File.join(File.dirname(__FILE__), 'lxc.rb'))
 require 'securerandom'
 require 'fileutils'
 require 'tmpdir'
+
+%w(
+  helpers lxc storage/overlay_directory
+  storage/overlay_mount storage/virtual_device
+).each do |path|
+  require "elecksee/#{path}"
+end
 
 class Lxc
 
@@ -146,10 +152,10 @@ class Lxc
 
     def setup
       create
-      discover_binds
       build_overlay
-      apply_custom_networking if ipaddress
       update_naming
+      discover_binds
+      apply_custom_networking if ipaddress
     end
 
     def build_overlay
@@ -174,6 +180,7 @@ class Lxc
         FileUtils.copy(o_path, File.join(path, File.basename(o_path)))
       end
       @lxc = Lxc.new(name)
+      Dir.mkdir(lxc.rootfs.to_path)
       contents = File.readlines(lxc.config)
       File.open(lxc.config, 'w') do |file|
         contents.each do |line|
@@ -212,7 +219,7 @@ class Lxc
         # If bind option used, bind in for rw
         if(bind)
           FileUtils.mkdir_p(lxc.rootfs.join(bind).to_path)
-          file.write "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0"
+          file.puts "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0"
         end
       end
     end
@@ -277,168 +284,5 @@ EOF
         end
       end
     end
-
-    class OverlayMount
-
-      include Helpers
-      
-      attr_reader :base
-      attr_reader :overlay
-      attr_reader :target
-      attr_reader :overlay_type
-      
-      def initialize(args={})
-        validate!(args)
-        @base = args[:base]
-        @overlay = args[:overlay]
-        @target = args[:target]
-        @overlay_type = args[:overlay_type] || 'overlayfs'
-      end
-
-      def mount
-        unless(mounted?)
-          case overlay_type
-          when 'aufs'
-            cmd = "mount -t aufs -o br=#{overlay}=rw:#{base}=ro,noplink none #{target}"
-          when 'overlayfs'
-            cmd = "mount -t overlayfs -oupperdir=#{overlay},lowerdir=#{base} none #{target}"
-          else
-            raise "Invalid overlay type provided: #{overlay_type}"
-          end
-          command(cmd, :sudo => true)
-          true
-        end
-      end
-
-      def mounted?
-        command("mount").stdout.include?(target)
-      end
-      
-      def unmount
-        if(mounted?)
-          command("umount #{target}", :sudo => true)
-          true
-        end
-      end
-
-      private
-
-      def validate!(args)
-        [:base, :overlay, :target].each do |required|
-          unless(args[required])
-            raise ArgumentError.new "Missing required argument: #{required}"
-          end
-          unless(File.directory?(args[required]))
-            raise TypeError.new "Provided argument is not a valid directory for #{required}: #{args[required]}"
-          end
-        end
-      end
-    end
-    
-    class OverlayDirectory
-      
-      attr_reader :name
-      attr_reader :tmp_dir
-
-      def initialize(name, args={})
-        @name = name
-        @tmp_dir = args[:tmp_dir] || '/tmp/lxc/ephemerals'
-        create
-      end
-
-      def overlay_path
-        File.join(tmp_dir, 'virt-overlays', name)
-      end
-      alias_method :target_path, :overlay_path
-
-      def create
-        unless(File.directory?(overlay_path))
-          FileUtils.mkdir_p(overlay_path)
-        end
-      end
-
-      def destroy
-        FileUtils.rm_rf(overlay_path) if File.directory?(overlay_path)
-      end
-        
-    end
-    
-    class VirtualDevice
-
-      include Helpers
-      
-      attr_reader :name
-      attr_reader :tmp_dir
-      attr_reader :size
-      attr_reader :tmp_fs
-      attr_reader :fs_type
-      
-      def initialize(name, args={})
-        @name = name
-        @tmp_dir = args[:tmp_dir] || '/tmp/lxc/ephemerals'
-        @size = args[:size] || 2000
-        @fs_type = args[:fs_type] || 'ext4'
-        @tmp_fs = !!args[:tmp_fs]
-        @fs_type = 'tmpfs' if @tmp_fs
-        create
-      end
-
-      def device_path
-        tmp_fs ? 'none' : File.join(tmp_dir, 'virt-imgs', name)
-      end
-
-      def mount_path
-        File.join(tmp_dir, 'virt-mnts', name)
-      end
-      alias_method :target_path, :mount_path
-
-      def create
-        make_directories!
-        unless(tmp_fs)
-          command("dd if=/dev/zero of=#{@device_path} bs=1k seek=#{sive}k count=1 > /dev/null")
-          command("echo \"y\" | mkfs -t #{fs_type} #{size} > /dev/null")
-        end
-      end
-
-      def mounted?
-        command("mount").stdout.include?(mount_path)
-      end
-      
-      def mount
-        unless(mounted?)
-          command("mount -t #{fs_type}#{mount_options} #{device_path} #{mount_path}", :sudo => true)
-          true
-        end
-      end
-
-      def unmount
-        if(mounted?)
-          command("umount #{mount_path}", :sudo => true)
-          true
-        end
-      end
-
-      def destroy
-        unmount
-        File.delete(device_path) if File.file?(device_path)
-        FileUtils.rm_rf(device_path) if File.directory?(device_path)
-        FileUtils.rmdir(mount_path) if File.directory?(mount_path)
-      end
-
-      private
-
-      def mount_options
-        ' -o loop' unless tmp_fs
-      end
-      
-      def make_directories!
-        [device_path, mount_path].each do |path|
-          unless(File.directory?(path))
-            FileUtils.mkdir_p(path)
-          end
-        end
-      end
-    end
-      
   end
 end
