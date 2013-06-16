@@ -39,7 +39,7 @@ class Lxc
     
     def unmount
       if(mounted?)
-        command("umount #{target}", :sudo => true)
+        command("umount #{target}", :sudo => true, :allow_failure => true)
         true
       end
     end

@@ -1,6 +1,7 @@
 require 'securerandom'
 require 'fileutils'
 require 'tmpdir'
+require 'etc'
 
 %w(
   helpers lxc storage/overlay_directory
@@ -67,7 +68,7 @@ class Lxc
       @ephemeral_binds = []
       @lxc = nil
     end
-
+    
     def register_traps
       %w(TERM INT QUIT).each do |sig|
         Signal.trap(sig){ cleanup }
@@ -112,8 +113,13 @@ class Lxc
       @ephemeral_overlay.unmount
       @ephemeral_binds.map(&:destroy)
       @ephemeral_device.destroy
-      FileUtils.rm_rf(lxc.path.to_path)
-      true
+      if(lxc.path.to_path.split('/').size > 1)
+        command("rm -rf #{lxc.path.to_path}", :sudo => true)
+        true
+      else
+        $stderr.puts "This path seems bad and I won't remove it: #{lxc.path.to_path}"
+        false
+      end
     end
 
     private
@@ -160,9 +166,9 @@ class Lxc
 
     def build_overlay
       if(directory)
-        @ephemeral_device = OverlayDirectory.new(name, :tmp_dir => directory.is_a?(String) ? directory : nil)
+        @ephemeral_device = OverlayDirectory.new(name, :tmp_dir => directory.is_a?(String) ? directory : tmp_dir)
       else
-        @ephemeral_device = VirtualDevice.new(name, :size => device, :tmp_fs => !device)
+        @ephemeral_device = VirtualDevice.new(name, :size => device, :tmp_fs => !device, :tmp_dir => tmp_dir)
         @ephemeral_device.mount
       end
       @ephemeral_overlay = OverlayMount.new(
@@ -174,11 +180,22 @@ class Lxc
       @ephemeral_overlay.mount
     end
 
+    def writable_path!(path)
+      unless(File.directory?(File.dirname(path)))
+        command("mkdir -p #{File.dirname(path)}", :sudo => true)
+      end
+      unless(File.exists?(path))
+        command("touch #{path}", :sudo => true)
+      end
+      command("chown #{Etc.getlogin} #{path}", :sudo => true)
+    end
+    
     def create
       Dir.glob(File.join(lxc_dir, original, '*')).each do |o_path|
         next unless File.file?(o_path)
-        FileUtils.copy(o_path, File.join(path, File.basename(o_path)))
+        command("cp #{o_path} #{File.join(path, File.basename(o_path))}", :sudo => true)
       end
+      command("chown -R #{Etc.getlogin} #{path}", :sudo => true)
       @lxc = Lxc.new(name)
       Dir.mkdir(lxc.rootfs.to_path)
       contents = File.readlines(lxc.config)
@@ -218,7 +235,7 @@ class Lxc
         end
         # If bind option used, bind in for rw
         if(bind)
-          FileUtils.mkdir_p(lxc.rootfs.join(bind).to_path)
+          command("mkdir -p #{lxc.rootfs.join(bind).to_path}", :sudo => true)
           file.puts "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0"
         end
       end
@@ -226,7 +243,8 @@ class Lxc
     
     def update_naming
       NAME_FILES.each do |file|
-        next unless File.exists?(lxc.path.join(file))        
+        next unless File.exists?(lxc.path.join(file))
+        writable_path!(lxc.path.join(file).to_path)
         contents = File.read(lxc.path.join(file))
         File.open(lxc.path.join(file), 'w') do |new_file|
           new_file.write contents.gsub(original, name)
@@ -234,6 +252,7 @@ class Lxc
       end
       HOSTNAME_FILES.each do |file|
         next unless File.exists?(lxc.path.join(file))
+        writable_path!(lxc.path.join(file).to_path)
         contents = File.read(lxc.path.join(file))
         File.open(lxc.path.join(file), 'w') do |new_file|
           new_file.write contents.gsub(original, hostname)
@@ -247,7 +266,8 @@ class Lxc
     
     def apply_custom_networking
       if(el_platform?)
-        File.open(@lxc.rootfs.join('etc/sysconfig/network-scripts/ifcfg-eth0'), 'w') do |file|
+        writable_path!(path = lxc.rootfs.join('etc/sysconfig/network-scripts/ifcfg-eth0'))
+        File.open(path, 'w') do |file|
           file.write <<-EOF
 DEVICE=eth0
 BOOTPROTO=static
@@ -261,7 +281,8 @@ IPV6INIT=no
 GATEWAY=#{gateway}
 EOF
         end
-        File.open(@lxc.rootfs.join('etc/sysconfig/network'), 'w') do |file|
+        writable_path!(path = lxc.rootfs.join('etc/sysconfig/network'))
+        File.open(path, 'w') do |file|
           file.write <<-EOF
 NETWORKING=yes
 HOSTNAME=#{hostname}
@@ -271,7 +292,8 @@ EOF
           file.puts "hostname #{hostname}"
         end
       else
-        File.open(@lxc.rootfs.join('etc/network/interfaces'), 'w') do |file|
+        writable_path!(path = lxc.rootfs.join('etc/network/interfaces'))
+        File.open(path, 'w') do |file|
           file.write <<-EOF
 auto lo
 iface lo inet loopback
