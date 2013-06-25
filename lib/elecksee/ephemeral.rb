@@ -62,7 +62,7 @@ class Lxc
     def initialize(args={})
       configure!(args)
       @cli = args[:cli]
-      @path = Dir.mktmpdir(File.join(lxc_dir, original))
+      @path = command("mktemp -d -p #{lxc_dir} #{original}-XXXXXXXXXXXX", :sudo => true).stdout.strip
       @name = File.basename(@path)
       @hostname = @name.gsub(%r{[^A-Za-z0-9\-]}, '')
       @ephemeral_binds = []
