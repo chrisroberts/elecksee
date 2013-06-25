@@ -72,7 +72,7 @@ class Lxc
     # Returns information about given container
     def info(name)
       res = {:state => nil, :pid => nil}
-      info = run_command("#{sudo}lxc-info -n #{name}").stdout.split("\n")
+      info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3).stdout.split("\n")
       if(info.first)
         parts = info.first.split(' ')
         res[:state] = parts.last.downcase.to_sym
