@@ -6,6 +6,8 @@ class Lxc
     attr_reader :name
     attr_reader :tmp_dir
 
+    include Helpers
+    
     def initialize(name, args={})
       @name = name
       @tmp_dir = args[:tmp_dir] || '/tmp/lxc/ephemerals'
@@ -24,7 +26,9 @@ class Lxc
     end
 
     def destroy
-      FileUtils.rm_rf(overlay_path) if File.directory?(overlay_path)
+      if(File.directory?(overlay_path))
+        command("rm -rf #{overlay_path}", :sudo => true)
+      end
     end
     
   end
