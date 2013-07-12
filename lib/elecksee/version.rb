@@ -2,5 +2,5 @@ module Elecksee
   class Version < Gem::Version
   end
 
-  VERSION = Version.new('1.0.7')
+  VERSION = Version.new('1.0.8')
 end
