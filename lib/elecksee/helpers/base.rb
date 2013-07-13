@@ -1,9 +1,9 @@
 class Lxc
   class CommandFailed < StandardError
   end
-  
-  module Helpers
 
+  module Helpers
+  
     def sudo
       Lxc.sudo
     end
@@ -30,7 +30,7 @@ class Lxc
           retries -= 1
           retry
         elsif(args[:allow_failure])
-          true
+          false
         else
           raise
         end
