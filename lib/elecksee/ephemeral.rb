@@ -17,14 +17,7 @@ class Lxc
 
     include Helpers
     include Helpers::Options
-
-    NAME_FILES = %w(fstab config)
-    HOSTNAME_FILES = %w(
-      rootfs/etc/hostname
-      rootfs/etc/hosts
-      rootfs/etc/sysconfig/network
-      rootfs/etc/sysconfig/network-scripts/ifcfg-eth0
-    )
+    include Helpers::Copies
 
     option :original, '-o', :string, :required => true, :desc => 'Original container name'
     option :ipaddress, '-I', :string, :desc => 'Custom IP address'
@@ -132,7 +125,7 @@ class Lxc
       @ephemeral_overlay = OverlayMount.new(
         :base => Lxc.new(original).rootfs.to_path,
         :overlay => ephemeral_device.target_path,
-        :target => lxc.rootfs.to_path,
+        :target => lxc.path.join('rootfs').to_path,
         :overlay_type => union
       )
       @ephemeral_overlay.mount
@@ -143,50 +136,39 @@ class Lxc
         next unless File.file?(o_path)
         command("cp #{o_path} #{File.join(path, File.basename(o_path))}", :sudo => true)
       end
-      command("chown -R #{Etc.getlogin} #{path}", :sudo => true)
       @lxc = Lxc.new(name)
-      Dir.mkdir(lxc.rootfs.to_path)
-      contents = File.readlines(lxc.config)
-      File.open(lxc.config, 'w') do |file|
-        contents.each do |line|
-          if(line.strip.start_with?('lxc.network.hwaddr'))
-            file.write "00:16:3e#{SecureRandom.hex(3).gsub(/(..)/, ':\1')}"
-          else
-            file.write line
-          end
-        end
-      end
+      command("mkdir -p '#{lxc.path.join('rootfs')}'", :sudo => true)
+      update_net_hwaddr
     end
 
     # TODO: Discovered binds for ephemeral are all tmpfs for now.
+    # TODO: We should default to overlay mount, make virt dev optional
     def discover_binds
-      contents = File.readlines(lxc.path.join('fstab'))
-      File.open(lxc.path.join('fstab'), 'w') do |file|
-        contents.each do |line|
-          parts = line.split(' ')
-          if(parts[3] == 'bind')
-            source = parts.first
-            target = parts[1].sub(%r{^.+rootfs/}, '')
-            container_target = lxc.rootfs.join(target).to_path
-            device = VirtualDevice.new(target.gsub('/', '_'), :tmp_fs => true)
-            device.mount
-            FileUtils.mkdir_p(container_target)
-            ephemeral_binds << device
-            if(union == 'overlayfs')
-              file.write "none #{container_target} overlayfs upperdir=#{device.mount_path},lowerdir=#{source} 0 0"
-            else
-              file.write "none #{container_target} aufs br=#{device.mount_path}=rw:#{source}=ro,noplink 0 0"
-            end
+      contents = File.readlines(lxc.path.join('fstab')).each do |line|
+        parts = line.split(' ')
+        if(parts[3] == 'bind')
+          source = parts.first
+          target = parts[1].sub(%r{^.+rootfs/}, '')
+          container_target = lxc.rootfs.join(target).to_path
+          device = VirtualDevice.new(target.gsub('/', '_'), :tmp_fs => true)
+          device.mount
+          FileUtils.mkdir_p(container_target)
+          ephemeral_binds << device
+          if(union == 'overlayfs')
+            "none #{container_target} overlayfs upperdir=#{device.mount_path},lowerdir=#{source} 0 0"
           else
-            file.write line
+            "none #{container_target} aufs br=#{device.mount_path}=rw:#{source}=ro,noplink 0 0"
           end
-        end
-        # If bind option used, bind in for rw
-        if(bind)
-          command("mkdir -p #{lxc.rootfs.join(bind).to_path}", :sudo => true)
-          file.puts "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0"
+        else
+          line
         end
       end
+      # If bind option used, bind in for rw
+      if(bind)
+        command("mkdir -p #{lxc.rootfs.join(bind).to_path}", :sudo => true)
+        contents << "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0\n"
+      end
+      write_file(lxc.path.join('fstab'), contents.join)
     end
   end
 end
