@@ -245,10 +245,10 @@ class Lxc
   alias_method :config, :container_config
 
   def container_rootfs
-    r_path = File.readlines.detect do |line|
+    r_path = File.readlines(config).detect do |line|
       line.start_with?('lxc.rootfs')
-    end.to_s.split('=').last
-    r_path ? Pathname.new(r_path) : container_path.join('rootfs')
+    end.to_s.split('=').last.to_s.strip
+    r_path.empty? ? container_path.join('rootfs') : Pathname.new(r_path)
   end
   alias_method :rootfs, :container_rootfs
 
