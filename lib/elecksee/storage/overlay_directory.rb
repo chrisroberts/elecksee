@@ -45,5 +45,6 @@ class Lxc
     def overlay_path
       File.join(tmp_dir, name)
     end
+    alias_method :target_path, :overlay_path
   end
 end
