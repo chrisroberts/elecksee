@@ -1,4 +1,4 @@
-require 'elecksee/helpers'
+require 'elecksee/helpers/base'
 
 class Lxc
   
