@@ -11,6 +11,7 @@ class Lxc
 
     include Helpers
     include Helpers::Options
+    include Helpers::Copies
 
     option :original, '-o', :string, :required => true, :desc => 'Original container name', :aliases => 'orig'
     option :new_name, '-n', :string, :required => true, :desc => 'New container name', :aliases => 'new'
@@ -26,27 +27,39 @@ class Lxc
 
     # Hash containing original and new container instances
     attr_reader :lxcs
-    
+
     def initialize(args={})
       configure!(args)
       @lxcs = {}
       @lxcs[:original] = Lxc.new(original)
       @lxcs[:new] = Lxc.new(new_name)
+      @created = []
       validate!
     end
 
     def clone!
-      copy_original
-      update_naming
-      apply_custom_addressing if ipaddress
-      lxcs[:new]
+      begin
+        copy_original
+        update_naming
+        apply_custom_addressing if ipaddress
+        lxcs[:new]
+      rescue Exception
+        @created.map(&:destroy)
+        raise
+      end
     end
     
     private
 
+    alias_method :name, :new_name
+    
     # Returns new lxc instance
     def lxc
       lxcs[:new]
+    end
+
+    def created(thing)
+      @created << thing
     end
 
     def validate!
@@ -77,6 +90,7 @@ class Lxc
 
     def copy_init
       directory = CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
+      created(directory)
       %w(config fstab).each do |file|
         command("cp '#{lxcs[:original].path.join(file)}' '#{directory.target_path}'", :sudo => true)
       end
@@ -84,12 +98,14 @@ class Lxc
 
     def copy_fs
       directory = CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
+      created(directory)
       command("rsync -ax '#{lxcs[:original].rootfs}/' '#{File.join(directory.target_path, 'rootfs')}/'", :sudo => true)
       File.join(directory.target_path, 'rootfs')
     end
 
     def copy_vbd
       storage = VirtualDevice.new(lxcs[:new].name, :tmp_dir => '/opt/lxc-vbd')
+      created(storage)
       command("rsync -ax '#{lxcs[:original].rootfs}/' '#{storage.target_path}/'", :sudo => true)
       storage.target_path
     end
@@ -101,6 +117,7 @@ class Lxc
     def copy_btrfs
       rootfs_path = lxcs[:new].path.join('rootfs')
       command("btrfs subvolume snapshot '#{lxcs[:original].rootfs}' '#{rootfs_path}'", :sudo => true)
+      # TODO: Remove on failure
       rootfs_path
     end
   end
