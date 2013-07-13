@@ -4,8 +4,9 @@ require 'tmpdir'
 require 'etc'
 
 %w(
-  helpers lxc storage/overlay_directory
-  storage/overlay_mount storage/virtual_device
+  helpers/base helpers/options helpers/copies lxc
+  storage/overlay_directory storage/overlay_mount
+  storage/virtual_device
 ).each do |path|
   require "elecksee/#{path}"
 end
@@ -15,6 +16,7 @@ class Lxc
   class Ephemeral
 
     include Helpers
+    include Helpers::Options
 
     NAME_FILES = %w(fstab config)
     HOSTNAME_FILES = %w(
@@ -23,18 +25,6 @@ class Lxc
       rootfs/etc/sysconfig/network
       rootfs/etc/sysconfig/network-scripts/ifcfg-eth0
     )
-    
-    class << self
-      attr_reader :options
-      
-      def option(name, short, type, args={})
-        @options ||= {}
-        @options[name] = args.merge(:short => short, :type => type)
-        instance_eval do
-          attr_accessor name.to_sym
-        end
-      end
-    end
 
     option :original, '-o', :string, :required => true, :desc => 'Original container name'
     option :ipaddress, '-I', :string, :desc => 'Custom IP address'
@@ -123,39 +113,7 @@ class Lxc
     end
 
     private
-
-    def configure!(args)
-      self.class.options.each do |name, opts|
-        argv = args.detect{|k,v| (Array(opts[:aliases]) + Array(opts[:short]) + [name]).include?(k.to_sym)}
-        argv = argv.last if argv
-        argv ||= opts[:default]
-        if(argv)
-          check_type!(name, argv, opts[:type])
-          self.send("#{name}=", argv)
-        else
-          if(opts[:required])
-            raise ArgumentError.new "Missing required argument: #{name}"
-          end
-        end
-      end
-      if(ipaddress && gateway.nil?)
-        self.gateway = ipaddress.sub(%r{\d+$}, '1')
-      end
-    end
-
-    def check_type!(arg_name, val, type)
-      valid = false
-      case type
-      when :string
-        valid = val.is_a?(String)
-      when :boolean
-        valid = val.is_a?(TrueClass) || val.is_a?(FalseClass)
-      when :integer
-        valid = val.is_a?(Numeric)
-      end
-      raise ArgumentError.new "Invalid type provided for #{arg_name}. Expecting value type of: #{type.inspect} Got: #{val.class} -  #{val}" unless valid
-    end
-
+    
     def setup
       create
       build_overlay
@@ -178,16 +136,6 @@ class Lxc
         :overlay_type => union
       )
       @ephemeral_overlay.mount
-    end
-
-    def writable_path!(path)
-      unless(File.directory?(File.dirname(path)))
-        command("mkdir -p #{File.dirname(path)}", :sudo => true)
-      end
-      unless(File.exists?(path))
-        command("touch #{path}", :sudo => true)
-      end
-      command("chown #{Etc.getlogin} #{path}", :sudo => true)
     end
     
     def create
@@ -237,72 +185,6 @@ class Lxc
         if(bind)
           command("mkdir -p #{lxc.rootfs.join(bind).to_path}", :sudo => true)
           file.puts "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0"
-        end
-      end
-    end
-    
-    def update_naming
-      NAME_FILES.each do |file|
-        next unless File.exists?(lxc.path.join(file))
-        writable_path!(lxc.path.join(file).to_path)
-        contents = File.read(lxc.path.join(file))
-        File.open(lxc.path.join(file), 'w') do |new_file|
-          new_file.write contents.gsub(original, name)
-        end
-      end
-      HOSTNAME_FILES.each do |file|
-        next unless File.exists?(lxc.path.join(file))
-        writable_path!(lxc.path.join(file).to_path)
-        contents = File.read(lxc.path.join(file))
-        File.open(lxc.path.join(file), 'w') do |new_file|
-          new_file.write contents.gsub(original, hostname)
-        end
-      end
-    end
-
-    def el_platform?
-      lxc.rootfs.join('etc/redhat-release').exist?
-    end
-    
-    def apply_custom_networking
-      if(el_platform?)
-        writable_path!(path = lxc.rootfs.join('etc/sysconfig/network-scripts/ifcfg-eth0'))
-        File.open(path, 'w') do |file|
-          file.write <<-EOF
-DEVICE=eth0
-BOOTPROTO=static
-NETMASK=#{netmask}
-IPADDR=#{ipaddress}
-ONBOOT=yes
-TYPE=Ethernet
-USERCTL=yes
-PEERDNS=yes
-IPV6INIT=no
-GATEWAY=#{gateway}
-EOF
-        end
-        writable_path!(path = lxc.rootfs.join('etc/sysconfig/network'))
-        File.open(path, 'w') do |file|
-          file.write <<-EOF
-NETWORKING=yes
-HOSTNAME=#{hostname}
-EOF
-        end
-        File.open(@lxc.rootfs.join('etc/rc.local'), 'w') do |file|
-          file.puts "hostname #{hostname}"
-        end
-      else
-        writable_path!(path = lxc.rootfs.join('etc/network/interfaces'))
-        File.open(path, 'w') do |file|
-          file.write <<-EOF
-auto lo
-iface lo inet loopback
-auto eth0
-iface eth0 inet static
-address #{ipaddress}
-netmask #{netmask}
-gateway #{gateway}
-EOF
         end
       end
     end
