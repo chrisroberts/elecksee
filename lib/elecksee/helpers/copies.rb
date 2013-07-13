@@ -4,6 +4,14 @@ class Lxc
   module Helpers
     module Copies
 
+      NAME_FILES = %w(fstab config)
+      HOSTNAME_FILES = %w(
+        rootfs/etc/hostname
+        rootfs/etc/hosts
+        rootfs/etc/sysconfig/network
+        rootfs/etc/sysconfig/network-scripts/ifcfg-eth0
+      )
+      
       def update_rootfs(rootfs_path)
         contents = File.readlines(lxc.config.to_s).map do |line|
           if(line.start_with?('lxc.rootfs'))
@@ -15,7 +23,20 @@ class Lxc
         write_file(lxc.config, contents)
       end
 
+      def update_net_hwaddr
+        contents = File.readlines(lxc.config).map do |line|
+          if(line.start_with?('lxc.network.hwaddr'))
+            parts = line.split('=')
+            "#{parts.first.strip} = 00:16:3e#{SecureRandom.hex(3).gsub(/(..)/, ':\1')}"
+          else
+            line
+          end
+        end.join
+        write_file(lxc.config, contents)
+      end
+
       def write_file(path, contents)
+        contents = contents.join if contents.is_a?(Array)
         tmp = Tempfile.new('lxc-copy')
         tmp.write(contents)
         tmp.close
