@@ -46,6 +46,7 @@ class Lxc
       configure!(args)
       @cli = args[:cli]
       @path = command("mktemp -d -p #{lxc_dir} #{original}-XXXXXXXXXXXX", :sudo => true).stdout.strip
+      command("chmod 0755 #{@path}", :sudo => true)
       @name = File.basename(@path)
       @hostname = @name.gsub(%r{[^A-Za-z0-9\-]}, '')
       @ephemeral_binds = []
