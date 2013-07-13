@@ -1,4 +1,4 @@
-require 'elecksee/helpers'
+require 'elecksee/helpers/base'
 require 'mixlib/shellout'
 require 'pathname'
 require 'tmpdir'
@@ -245,7 +245,10 @@ class Lxc
   alias_method :config, :container_config
 
   def container_rootfs
-    container_path.join('rootfs')
+    r_path = File.readlines.detect do |line|
+      line.start_with?('lxc.rootfs')
+    end.to_s.split('=').last
+    r_path ? Pathname.new(r_path) : container_path.join('rootfs')
   end
   alias_method :rootfs, :container_rootfs
 
