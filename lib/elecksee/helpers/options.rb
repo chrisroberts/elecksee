@@ -5,13 +5,15 @@ class Lxc
       class << self
         def included(klass)
           klass.class_eval do
-            attr_reader :options
-            
-            def option(name, short, type, args={})
-              @options ||= {}
-              @options[name] = args.merge(:short => short, :type => type)
-              instance_eval do
-                attr_accessor name.to_sym
+            class << self
+              attr_reader :options
+              
+              def option(name, short, type, args={})
+                @options ||= {}
+                @options[name] = args.merge(:short => short, :type => type)
+                instance_eval do
+                  attr_accessor name.to_sym
+                end
               end
             end
           end
