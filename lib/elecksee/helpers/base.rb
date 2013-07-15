@@ -14,7 +14,7 @@ class Lxc
       cmd = [sudo, cmd].join(' ') if args[:sudo]
       begin
         shlout = Mixlib::ShellOut.new(cmd, 
-          :logger => defined?(Chef) ? Chef::Log.logger : log,
+          :logger => defined?(Chef) && defined?(Chef::Log) ? Chef::Log.logger : log,
           :live_stream => args[:livestream] ? STDOUT : nil,
           :timeout => args[:timeout] || 1200,
           :environment => {'HOME' => detect_home}

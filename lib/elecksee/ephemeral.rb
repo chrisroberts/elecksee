@@ -32,6 +32,7 @@ class Lxc
     option :ssh_key, '-S', :string, :default => '/opt/hw-lxc-config/id_rsa', :aliases => 'ssh-key', :desc => 'Deprecated: Provided for compatibility'
     option :lxc_dir, '-L', :string, :default => '/var/lib/lxc', :aliases => 'lxc-dir', :desc => 'Directory of LXC store'
     option :tmp_dir, '-T', :string, :default => '/tmp/lxc/ephemerals', :aliases => 'tmp-dir', :desc => 'Directory of ephemeral temp files'
+    option :ephemeral_command, '-C', :string, :aliases => 'command'
 
     attr_reader :name
     attr_reader :cli
@@ -65,6 +66,21 @@ class Lxc
         puts "    - Connect using: sudo ssh -i #{ssh_key} root@#{lxc.container_ip(10)}"
       end
     end
+
+    def start_action
+      begin
+        lxc.start
+        if(ephemeral_command)
+          lxc.container_command(ephemeral_command)
+        else
+          cli_output
+          lxc.wait_for_state(:stopped)
+        end
+      ensure
+        cleanup
+      end
+      true
+    end
     
     def start!(*args)
       register_traps
@@ -72,23 +88,14 @@ class Lxc
       if(daemon)
         if(args.include?(:fork))
           fork do
-            lxc.start
-            cli_output
-            lxc.wait_for_state(:stopped)
-            cleanup
+            start_action
           end
         else
           Process.daemon
-          lxc.start
-          cli_output
-          lxc.wait_for_state(:stopped)
-          cleanup
+          start_action
         end
       else
-        lxc.start
-        cli_output
-        lxc.wait_for_state(:stopped)
-        cleanup
+        start_action
       end
     end
 
