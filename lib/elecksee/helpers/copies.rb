@@ -27,7 +27,7 @@ class Lxc
         contents = File.readlines(lxc.config).map do |line|
           if(line.start_with?('lxc.network.hwaddr'))
             parts = line.split('=')
-            "#{parts.first.strip} = 00:16:3e#{SecureRandom.hex(3).gsub(/(..)/, ':\1')}"
+            "#{parts.first.strip} = 00:16:3e#{SecureRandom.hex(3).gsub(/(..)/, ':\1')}\n"
           else
             line
           end
