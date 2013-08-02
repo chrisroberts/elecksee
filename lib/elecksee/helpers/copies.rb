@@ -45,14 +45,16 @@ class Lxc
         command("chmod 0644 #{path}", :sudo => true)
       end
       
-      def update_naming
+      def update_naming(*args)
         NAME_FILES.each do |file|
           next unless File.exists?(lxc.path.join(file))
+          next if args.include?("no_#{file}".to_sym)
           contents = File.read(lxc.path.join(file)).gsub(original, name)
           write_file(lxc.path.join(file), contents)
         end
         HOSTNAME_FILES.each do |file|
           next unless File.exists?(lxc.path.join(file))
+          next if args.include?("no_#{file}".to_sym)
           contents = File.read(lxc.path.join(file)).gsub(original, name)
           write_file(lxc.path.join(file), contents)
         end
