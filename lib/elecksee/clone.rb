@@ -40,7 +40,7 @@ class Lxc
     def clone!
       begin
         copy_original
-        update_naming
+        update_naming(:no_config)
         apply_custom_addressing if ipaddress
         lxcs[:new]
       rescue Exception
