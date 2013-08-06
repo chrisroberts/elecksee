@@ -1,3 +1,9 @@
+## v1.0.10
+* Add clone support
+* Allow command passage to ephemeral nodes
+* Update temp directories to be world accessible/readable
+* Clean up and dry out some reusable bits
+
 ## v1.0.8
 * Delete overlay directories using `sudo`
 
