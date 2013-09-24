@@ -5,13 +5,37 @@ class Lxc
     attr_reader :base
 
     class << self
-      def generate_config(resource)
-        config = []
-        config << "lxc.utsname = #{resource.utsname}"
-        if(resource.aa_profile)
-          config << "lxc.aa_profile = #{resource.aa_profile}"
+
+      def convert_to_hash(thing)
+        unless(thing.is_a?(Hash))
+          result = defined?(Mash) ? Mash.new : {}
+          thing.each do |k,v|
+            result[k] = v.respond_to?(:keys) && v.respond_to?(:values) ? convert_to_hash(v) : v
+          end
         end
-        [resource.network].flatten.each do |net_hash|
+        result || thing
+      end
+
+      def symbolize_hash(thing)
+        if(defined?(Mash))
+          Mash.new(thing)
+        else
+          result = {}
+          thing.each do |k,v|
+            result[k.to_sym] = v.is_a?(Hash) ? symbolize_hash(v) : v
+          end
+          result
+        end
+      end
+
+      def generate_config(resource)
+        resource = symbolize_hash(convert_to_hash(resource))
+        config = []
+        config << "lxc.utsname = #{resource[:utsname]}"
+        if(resource[:aa_profile])
+          config << "lxc.aa_profile = #{resource[:aa_profile]}"
+        end
+        [resource.[:network]].flatten.each do |net_hash|
           nhsh = Mash.new(net_hash)
           flags = nhsh.delete(:flags)
           %w(type link).each do |k|
@@ -24,14 +48,14 @@ class Lxc
             config << "lxc.network.flags = #{flags}"
           end
         end
-        if(resource.cap_drop)
-          config << "lxc.cap.drop = #{Array(resource.cap_drop).join(' ')}"
+        if(resource[:cap_drop])
+          config << "lxc.cap.drop = #{Array(resource[:cap_drop]).join(' ')}"
         end
         %w(pts tty arch devttydir mount mount_entry rootfs rootfs_mount pivotdir).each do |k|
-          config << "lxc.#{k.sub('_', '.')} = #{resource.send(k)}" if resource.send(k)
+          config << "lxc.#{k.sub('_', '.')} = #{resource[k.to_sym]}" if resource[k.to_sym]
         end
         prefix = 'lxc.cgroup'
-        resource.cgroup.each_pair do |key, value|
+        resource[:cgroup].each_pair do |key, value|
           if(value.is_a?(Array))
             value.each do |val|
               config << "#{prefix}.#{key} = #{val}"
@@ -49,7 +73,7 @@ class Lxc
       raise 'LXC config file not found' unless File.exists?(path)
       @path = path
       @network = []
-      @base = Mash.new
+      @base = defined?(Mash) ? Mash.new : {}
       parse!
     end
 
