@@ -1,28 +1,82 @@
 class Lxc
   class CommandFailed < StandardError
+    attr_accessor :original
+    def initialize(orig)
+      @original = orig
+      super(orig.to_s)
+    end
+  end
+
+  class Timeout < CommandFailed
+  end
+
+  class CommandResult
+    attr_reader :original, :stdout, :stderr
+    def initialize(result)
+      @original = result
+      case result.class.to_s
+      when 'ChildProcess::AbstractProcess'
+        extract_childprocess
+      when 'Mixlib::ShellOut'
+        extract_shellout
+      else
+        raise TypeError.new("Unknown process result type received: #{result.class}")
+      end
+    end
+
+    def extract_childprocess
+      original.io.stdout.rewind
+      original.io.stderr.rewind
+      @stdout = original.io.stdout.read
+      @stderr = original.io.stderr.read
+    end
+
+    def extract_shellout
+      @stdout = original.stdout
+      @stderr = original.stderr
+    end
   end
 
   module Helpers
-  
+
     def sudo
       Lxc.sudo
     end
-    
+
     # Simple helper to shell out
     def run_command(cmd, args={})
+      if(defined?(ChildProcess))
+        require 'tempfile'
+        result = child_process_command(cmd, args)
+      else
+        require 'mixlib/shellout'
+        result = mixlib_shellout_command(cmd, args)
+      end
+      CommandResult.new(result)
+    end
+
+    def child_process_command(cmd, args)
       retries = args[:allow_failure_retry].to_i
       cmd = [sudo, cmd].join(' ') if args[:sudo]
       begin
-        shlout = Mixlib::ShellOut.new(cmd, 
-          :logger => defined?(Chef) && defined?(Chef::Log) ? Chef::Log.logger : log,
-          :live_stream => args[:livestream] ? STDOUT : nil,
-          :timeout => args[:timeout] || 1200,
-          :environment => {'HOME' => detect_home}
-        )
-        shlout.run_command
-        shlout.error!
-        shlout
-      rescue Mixlib::ShellOut::ShellCommandFailed, CommandFailed, Mixlib::ShellOut::CommandTimeout
+        s_out = Tempfile.new('stdout')
+        s_err = Tempfile.new('stderr')
+        s_out.sync
+        s_err.sync
+        c_proc = ChildProcess.build(*cmd.split(' '))
+        c_proc.environment.merge('HOME' => detect_home)
+        c_proc.io.stdout = s_out
+        c_proc.io.stderr = s_err
+        c_proc.start
+        begin
+          c_proc.poll_for_exit(args[:timeout] || 1200)
+        rescue ChildProcess::TimeoutError
+          c_proc.stop
+        ensure
+          raise CommandFailed.new("Command failed: #{cmd}") if c_proc.crashed?
+        end
+        c_proc
+      rescue CommandFailed
         if(retries > 0)
           log.warn "LXC run command failed: #{cmd}"
           log.warn "Retrying command. #{args[:allow_failure_retry].to_i - retries} of #{args[:allow_failure_retry].to_i} retries remain"
@@ -37,10 +91,38 @@ class Lxc
       end
     end
 
+    def mixlib_shellout_command(cmd, args)
+      retries = args[:allow_failure_retry].to_i
+      cmd = [sudo, cmd].join(' ') if args[:sudo]
+      begin
+        shlout = Mixlib::ShellOut.new(cmd,
+          :logger => defined?(Chef) && defined?(Chef::Log) ? Chef::Log.logger : log,
+          :live_stream => args[:livestream] ? STDOUT : nil,
+          :timeout => args[:timeout] || 1200,
+          :environment => {'HOME' => detect_home}
+        )
+        shlout.run_command
+        shlout.error!
+        shlout
+      rescue Mixlib::ShellOut::ShellCommandFailed, CommandFailed, Mixlib::ShellOut::CommandTimeout => e
+        if(retries > 0)
+          log.warn "LXC run command failed: #{cmd}"
+          log.warn "Retrying command. #{args[:allow_failure_retry].to_i - retries} of #{args[:allow_failure_retry].to_i} retries remain"
+          sleep(0.3)
+          retries -= 1
+          retry
+        elsif(args[:allow_failure])
+          false
+        else
+          raise CommandFailed.new(e)
+        end
+      end
+    end
+
     def command(*args)
       run_command(*args)
     end
-    
+
     def log
       if(defined?(Chef))
         Chef::Log
@@ -52,7 +134,7 @@ class Lxc
         @logger
       end
     end
-    
+
     # Detect HOME environment variable. If not an acceptable
     # value, set to /root or /tmp
     def detect_home(set_if_missing=false)

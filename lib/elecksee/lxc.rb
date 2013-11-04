@@ -1,10 +1,9 @@
 require 'elecksee/helpers/base'
-require 'mixlib/shellout'
 require 'pathname'
 require 'tmpdir'
 
 class Lxc
-  
+
   # Pathname#join does not act like File#join when joining paths that
   # begin with '/', and that's dumb. So we'll make our own Pathname,
   # with a #join that uses File
@@ -13,7 +12,7 @@ class Lxc
       self.class.new(::File.join(self.to_path, *args))
     end
   end
-  
+
   include Helpers
 
   attr_reader :name, :base_path, :lease_file, :preferred_device
@@ -21,7 +20,7 @@ class Lxc
   class << self
 
     include Helpers
-    
+
     attr_accessor :use_sudo
     attr_accessor :base_path
 
@@ -33,11 +32,11 @@ class Lxc
         "#{use_sudo} "
       end
     end
-    
+
     def base_path
       @base_path || '/var/lib/lxc'
     end
-        
+
     # List running containers
     def running
       full_list[:running]
@@ -67,7 +66,7 @@ class Lxc
         end
       end.compact
     end
-    
+
     # name:: Name of container
     # Returns information about given container
     def info(name)
@@ -82,6 +81,7 @@ class Lxc
       else
         res[:state] = :unknown
         res[:pid] = -1
+        res
       end
     end
 
@@ -130,7 +130,7 @@ class Lxc
   def stopped?
     self.class.info(name)[:state] == :stopped
   end
- 
+
   # Returns if container is frozen
   def frozen?
     self.class.info(name)[:state] == :frozen
@@ -281,7 +281,7 @@ class Lxc
     run_command("#{sudo}lxc-stop -n #{name}", :allow_failure_retry => 3)
     wait_for_state(:stopped)
   end
-  
+
   # Freeze the container
   def freeze
     run_command("#{sudo}lxc-freeze -n #{name}")
@@ -310,14 +310,13 @@ class Lxc
   end
 
   def direct_container_command(command, args={})
-    com = "#{sudo}ssh root@#{args[:ip] || container_ip} -i /opt/hw-lxc-config/id_rsa -oStrictHostKeyChecking=no '#{command}'"
     begin
-      cmd = Mixlib::ShellOut.new(com,
-        :live_stream => args[:live_stream],
-        :timeout => args[:timeout] || 1200
+      run_command(
+        "ssh root@#{args[:ip] || container_ip} -i /opt/hw-lxc-config/id_rsa -oStrictHostKeyChecking=no '#{command}'",
+        :sudo => args[:sudo],
+        :timeout => args[:timeout],
+        :live_stream => args[:live_stream]
       )
-      cmd.run_command
-      cmd.error!
       true
     rescue
       raise if args[:raise_on_failure]
@@ -325,34 +324,6 @@ class Lxc
     end
   end
   alias_method :knife_container, :direct_container_command
-
-  # Simple helper to shell out
-  def run_command(cmd, args={})
-    retries = args[:allow_failure_retry].to_i
-    begin
-      shlout = Mixlib::ShellOut.new(cmd, 
-        :logger => defined?(Chef) ? Chef::Log.logger : log,
-        :live_stream => args[:livestream] ? nil : STDOUT,
-        :timeout => args[:timeout] || 1200,
-        :environment => {'HOME' => detect_home}
-      )
-      shlout.run_command
-      shlout.error!
-      shlout
-    rescue Mixlib::ShellOut::ShellCommandFailed, CommandFailed, Mixlib::ShellOut::CommandTimeout
-      if(retries > 0)
-        log.warn "LXC run command failed: #{cmd}"
-        log.warn "Retrying command. #{args[:allow_failure_retry].to_i - retries} of #{args[:allow_failure_retry].to_i} retries remain"
-        sleep(0.3)
-        retries -= 1
-        retry
-      elsif(args[:allow_failure])
-        true
-      else
-        raise
-      end
-    end
-  end
 
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
@@ -376,7 +347,7 @@ class Lxc
       home
     end
   end
-  
+
   # cmd:: Shell command string
   # retries:: Number of retry attempts (1 second sleep interval)
   # Runs command in container via ssh
