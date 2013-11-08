@@ -23,6 +23,7 @@ class Lxc
 
     attr_accessor :use_sudo
     attr_accessor :base_path
+    attr_accessor :shellout_helper
 
     def sudo
       case use_sudo
@@ -313,7 +314,7 @@ class Lxc
     begin
       run_command(
         "ssh root@#{args[:ip] || container_ip} -i /opt/hw-lxc-config/id_rsa -oStrictHostKeyChecking=no '#{command}'",
-        :sudo => args[:sudo],
+        :sudo => true,
         :timeout => args[:timeout],
         :live_stream => args[:live_stream]
       )
@@ -385,3 +386,5 @@ class Lxc
   end
 
 end
+
+Lxc.shellout_helper = :mixlib_shellout

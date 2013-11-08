@@ -1,8 +1,9 @@
 class Lxc
   class CommandFailed < StandardError
-    attr_accessor :original
-    def initialize(orig)
+    attr_accessor :original, :result
+    def initialize(orig, result=nil)
       @original = orig
+      @result = result
       super(orig.to_s)
     end
   end
@@ -14,10 +15,9 @@ class Lxc
     attr_reader :original, :stdout, :stderr
     def initialize(result)
       @original = result
-      case result.class.to_s
-      when 'ChildProcess::AbstractProcess'
+      if(result.class.ancestors.map(&:to_s).include?('ChildProcess::AbstractProcess'))
         extract_childprocess
-      when 'Mixlib::ShellOut'
+      elsif(result.class.to_s == 'Mixlib::ShellOut')
         extract_shellout
       else
         raise TypeError.new("Unknown process result type received: #{result.class}")
@@ -29,6 +29,8 @@ class Lxc
       original.io.stderr.rewind
       @stdout = original.io.stdout.read
       @stderr = original.io.stderr.read
+      original.io.stdout.delete
+      original.io.stderr.delete
     end
 
     def extract_shellout
@@ -45,12 +47,23 @@ class Lxc
 
     # Simple helper to shell out
     def run_command(cmd, args={})
-      if(defined?(ChildProcess))
+      cmd_type = Lxc.shellout_helper
+      unless(cmd_type)
+        if(defined?(ChildProcess))
+          cmd_type = :childprocess
+        else
+          cmd_type = :mixlib_shellout
+        end
+      end
+      case cmd_type
+      when :childprocess
         require 'tempfile'
         result = child_process_command(cmd, args)
-      else
+      when :mixlib_shellout
         require 'mixlib/shellout'
         result = mixlib_shellout_command(cmd, args)
+      else
+        raise ArgumentError.new("Unknown shellout helper provided: #{cmd_type}")
       end
       CommandResult.new(result)
     end
@@ -63,7 +76,9 @@ class Lxc
         s_err = Tempfile.new('stderr')
         s_out.sync
         s_err.sync
-        c_proc = ChildProcess.build(*cmd.split(' '))
+        cmd_parts = cmd.split(' ')
+        cmd_parts.delete_if(&:empty?)
+        c_proc = ChildProcess.build(*cmd_parts)
         c_proc.environment.merge('HOME' => detect_home)
         c_proc.io.stdout = s_out
         c_proc.io.stderr = s_err
@@ -73,7 +88,7 @@ class Lxc
         rescue ChildProcess::TimeoutError
           c_proc.stop
         ensure
-          raise CommandFailed.new("Command failed: #{cmd}") if c_proc.crashed?
+          raise CommandFailed.new("Command failed: #{cmd}", CommandResult.new(c_proc)) if c_proc.crashed?
         end
         c_proc
       rescue CommandFailed
@@ -94,6 +109,7 @@ class Lxc
     def mixlib_shellout_command(cmd, args)
       retries = args[:allow_failure_retry].to_i
       cmd = [sudo, cmd].join(' ') if args[:sudo]
+      shlout = nil
       begin
         shlout = Mixlib::ShellOut.new(cmd,
           :logger => defined?(Chef) && defined?(Chef::Log) ? Chef::Log.logger : log,
@@ -114,7 +130,7 @@ class Lxc
         elsif(args[:allow_failure])
           false
         else
-          raise CommandFailed.new(e)
+          raise CommandFailed.new(e, CommandResult.new(shlout))
         end
       end
     end

@@ -53,10 +53,10 @@ class Lxc
       @ephemeral_binds = []
       @lxc = nil
     end
-    
+
     def register_traps
       %w(TERM INT QUIT).each do |sig|
-        Signal.trap(sig){ cleanup }
+        Signal.trap(sig){ cleanup && raise }
       end
     end
 
@@ -71,6 +71,7 @@ class Lxc
       begin
         lxc.start
         if(ephemeral_command)
+          lxc.wait_for_state(:running)
           lxc.container_command(ephemeral_command)
         else
           cli_output
@@ -81,7 +82,7 @@ class Lxc
       end
       true
     end
-    
+
     def start!(*args)
       register_traps
       setup
@@ -114,7 +115,7 @@ class Lxc
     end
 
     private
-    
+
     def setup
       create
       build_overlay
@@ -138,14 +139,14 @@ class Lxc
       )
       @ephemeral_overlay.mount
     end
-    
+
     def create
       Dir.glob(File.join(lxc_dir, original, '*')).each do |o_path|
         next unless File.file?(o_path)
         command("cp #{o_path} #{File.join(path, File.basename(o_path))}", :sudo => true)
       end
       @lxc = Lxc.new(name)
-      command("mkdir -p '#{lxc.path.join('rootfs')}'", :sudo => true)
+      command("mkdir -p #{lxc.path.join('rootfs')}", :sudo => true)
       update_net_hwaddr
     end
 
