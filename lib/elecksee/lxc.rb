@@ -312,11 +312,10 @@ class Lxc
 
   # Destroy the container
   def destroy
-    if stopped?
-      run_command("#{sudo}lxc-destroy -n #{name}")
-    else
-      raise "You must stop shutdown/stop a container before destroying it"
+    unless stopped?
+      stop
     end
+    run_command("#{sudo}lxc-destroy -n #{name}")
   end
 
   def direct_container_command(command, args={})
