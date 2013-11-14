@@ -362,7 +362,6 @@ class Lxc
     end
   end
 
->>>>>>> [ephemeral] lxc.destroy()
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
     wait_total = 0.0
