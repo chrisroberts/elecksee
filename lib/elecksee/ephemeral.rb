@@ -83,6 +83,10 @@ class Lxc
       true
     end
 
+    def create!
+      setup
+    end
+
     def start!(*args)
       register_traps
       setup
