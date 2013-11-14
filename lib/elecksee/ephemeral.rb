@@ -53,7 +53,7 @@ class Lxc
       @ephemeral_binds = []
       @lxc = nil
     end
-    
+
     def register_traps
       %w(TERM INT QUIT).each do |sig|
         Signal.trap(sig){ cleanup }
@@ -81,7 +81,11 @@ class Lxc
       end
       true
     end
-    
+
+    def create!
+      setup
+    end
+
     def start!(*args)
       register_traps
       setup
@@ -114,7 +118,7 @@ class Lxc
     end
 
     private
-    
+
     def setup
       create
       build_overlay
@@ -138,7 +142,7 @@ class Lxc
       )
       @ephemeral_overlay.mount
     end
-    
+
     def create
       Dir.glob(File.join(lxc_dir, original, '*')).each do |o_path|
         next unless File.file?(o_path)
