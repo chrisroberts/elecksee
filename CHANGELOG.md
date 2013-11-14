@@ -1,3 +1,7 @@
+## v1.0.12
+* Allow access to ephemeral setup without creation
+* Add `#destroy` method to `Lxc` instances
+
 ## v1.0.10
 * Add clone support
 * Allow command passage to ephemeral nodes
