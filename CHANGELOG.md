@@ -1,3 +1,6 @@
+## v1.0.14
+* Remove rebase artifact because duh
+
 ## v1.0.12
 * Allow access to ephemeral setup without creation
 * Add `#destroy` method to `Lxc` instances
