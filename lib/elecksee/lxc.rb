@@ -310,6 +310,15 @@ class Lxc
     end
   end
 
+  # Destroy the container
+  def destroy
+    if stopped?
+      run_command("#{sudo}lxc-destroy -n #{name}")
+    else
+      raise "You must stop shutdown/stop a container before destroying it"
+    end
+  end
+
   def direct_container_command(command, args={})
     begin
       run_command(
@@ -326,6 +335,35 @@ class Lxc
   end
   alias_method :knife_container, :direct_container_command
 
+  # Simple helper to shell out
+  def run_command(cmd, args={})
+    retries = args[:allow_failure_retry].to_i
+    begin
+      shlout = Mixlib::ShellOut.new(cmd,
+        :logger => defined?(Chef) ? Chef::Log.logger : log,
+        :live_stream => args[:livestream] ? nil : STDOUT,
+        :timeout => args[:timeout] || 1200,
+        :environment => {'HOME' => detect_home}
+      )
+      shlout.run_command
+      shlout.error!
+      shlout
+    rescue Mixlib::ShellOut::ShellCommandFailed, CommandFailed, Mixlib::ShellOut::CommandTimeout
+      if(retries > 0)
+        log.warn "LXC run command failed: #{cmd}"
+        log.warn "Retrying command. #{args[:allow_failure_retry].to_i - retries} of #{args[:allow_failure_retry].to_i} retries remain"
+        sleep(0.3)
+        retries -= 1
+        retry
+      elsif(args[:allow_failure])
+        true
+      else
+        raise
+      end
+    end
+  end
+
+>>>>>>> [ephemeral] lxc.destroy()
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
     wait_total = 0.0
