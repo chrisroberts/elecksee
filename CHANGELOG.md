@@ -1,9 +1,12 @@
+## v1.0.16
+* Fix syntax bug in `Lxc::FileConfig` (thanks @mikerowehl)
+
 ## v1.0.14
 * Remove rebase artifact because duh
 
 ## v1.0.12
-* Allow access to ephemeral setup without creation
-* Add `#destroy` method to `Lxc` instances
+* Allow access to ephemeral setup without creation (thanks @portertech)
+* Add `#destroy` method to `Lxc` instances (thanks @portertech)
 
 ## v1.0.10
 * Add clone support
