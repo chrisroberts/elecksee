@@ -9,7 +9,7 @@ class Lxc
       def convert_to_hash(thing)
         unless(thing.is_a?(Hash))
           result = defined?(Mash) ? Mash.new : {}
-          thing.each do |k,v|
+          thing.to_hash.each do |k,v|
             result[k] = v.respond_to?(:keys) && v.respond_to?(:values) ? convert_to_hash(v) : v
           end
         end
