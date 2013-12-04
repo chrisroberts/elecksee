@@ -333,7 +333,7 @@ class Lxc
     end
   end
   alias_method :knife_container, :direct_container_command
-
+=begin
   # Simple helper to shell out
   def run_command(cmd, args={})
     retries = args[:allow_failure_retry].to_i
@@ -361,7 +361,7 @@ class Lxc
       end
     end
   end
-
+=end
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
     wait_total = 0.0
