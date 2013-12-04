@@ -1,3 +1,5 @@
+require 'shellwords'
+
 class Lxc
   class CommandFailed < StandardError
     attr_accessor :original, :result
@@ -76,9 +78,7 @@ class Lxc
         s_err = Tempfile.new('stderr')
         s_out.sync
         s_err.sync
-        cmd_parts = cmd.split(' ')
-        cmd_parts.delete_if(&:empty?)
-        c_proc = ChildProcess.build(*cmd_parts)
+        c_proc = ChildProcess.build(*Shellwords.split(cmd))
         c_proc.environment.merge('HOME' => detect_home)
         c_proc.io.stdout = s_out
         c_proc.io.stderr = s_err
