@@ -67,7 +67,7 @@ class Lxc
       else
         raise ArgumentError.new("Unknown shellout helper provided: #{cmd_type}")
       end
-      CommandResult.new(result)
+      result == false ? false : CommandResult.new(result)
     end
 
     def child_process_command(cmd, args)
