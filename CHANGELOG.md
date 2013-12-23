@@ -1,3 +1,9 @@
+## v1.0.18
+* Use shellwords to properly break down commands
+* Force hash type as required
+* Return expected type on command failure
+* Remove custom `run_command` and use helper based method instead
+
 ## v1.0.16
 * Fix syntax bug in `Lxc::FileConfig` (thanks @mikerowehl)
 
