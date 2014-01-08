@@ -10,8 +10,10 @@ class Lxc
         if(defined?(Chef) && thing.is_a?(Chef::Resource))
           result = Hash[*(
               (thing.methods - Chef::Resource.instance_methods).map{ |key|
-                [key, thing.send(key)] unless key.to_s.start_with('_')
-              }.flatten.compact
+                unless(key.to_s.start_with?('_') || thing.send(key).nil?)
+                  [key, thing.send(key)]
+                end
+              }.compact.flatten(1)
           )]
         else
           unless(thing.is_a?(Hash))
