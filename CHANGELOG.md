@@ -1,3 +1,6 @@
+## v1.0.20
+* Fix `LxcFileConfig` population when using `Chef::Resource` instance
+
 ## v1.0.18
 * Use shellwords to properly break down commands
 * Force hash type as required
