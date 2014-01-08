@@ -7,10 +7,18 @@ class Lxc
     class << self
 
       def convert_to_hash(thing)
-        unless(thing.is_a?(Hash))
-          result = defined?(Mash) ? Mash.new : {}
-          thing.to_hash.each do |k,v|
-            result[k] = v.respond_to?(:keys) && v.respond_to?(:values) ? convert_to_hash(v) : v
+        if(defined?(Chef) && thing.is_a?(Chef::Resource))
+          result = Hash[*(
+              (thing.methods - Chef::Resource.instance_methods).map{ |key|
+                [key, thing.send(key)] unless key.to_s.start_with('_')
+              }.flatten.compact
+          )]
+        else
+          unless(thing.is_a?(Hash))
+            result = defined?(Mash) ? Mash.new : {}
+            thing.to_hash.each do |k,v|
+              result[k] = v.respond_to?(:keys) && v.respond_to?(:values) ? convert_to_hash(v) : v
+            end
           end
         end
         result || thing
