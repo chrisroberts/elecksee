@@ -1,17 +1,17 @@
 require 'elecksee/helpers/base'
 
 class Lxc
-  
+
   class VirtualDevice
 
     include Helpers
-    
+
     attr_reader :name
     attr_reader :tmp_dir
     attr_reader :size
     attr_reader :tmp_fs
     attr_reader :fs_type
-    
+
     def initialize(name, args={})
       @name = name
       @tmp_dir = args[:tmp_dir] || '/tmp/lxc/ephemerals'
@@ -23,7 +23,7 @@ class Lxc
     end
 
     def device_path
-      tmp_fs ? 'none' : File.join(tmp_dir, 'virt-imgs', name)
+      tmp_fs ? :none : File.join(tmp_dir, 'virt-imgs', name)
     end
 
     def mount_path
@@ -42,7 +42,7 @@ class Lxc
     def mounted?
       command("mount").stdout.include?(mount_path)
     end
-    
+
     def mount
       unless(mounted?)
         command("mount -t #{fs_type}#{mount_options} #{device_path} #{mount_path}", :sudo => true)
@@ -69,9 +69,10 @@ class Lxc
     def mount_options
       ' -o loop' unless tmp_fs
     end
-    
+
     def make_directories!
       [device_path, mount_path].each do |path|
+        next if path == :none
         unless(File.directory?(path))
           FileUtils.mkdir_p(path)
         end
