@@ -59,9 +59,11 @@ class Lxc
 
     def destroy
       unmount
-      File.delete(device_path) if File.file?(device_path)
-      FileUtils.rm_rf(device_path) if File.directory?(device_path)
-      FileUtils.rmdir(mount_path) if File.directory?(mount_path)
+      unless(device_path == :none)
+        File.delete(device_path) if File.file?(device_path)
+        FileUtils.rm_rf(device_path) if File.directory?(device_path)
+      end
+      FileUtils.rmdir(mount_path) if File.directory?(mount_path) unless mount_path == :none
     end
 
     private
