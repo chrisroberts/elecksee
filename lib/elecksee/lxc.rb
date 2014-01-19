@@ -1,4 +1,5 @@
 require 'elecksee/helpers/base'
+require 'shellwords'
 require 'pathname'
 require 'tmpdir'
 
@@ -72,7 +73,7 @@ class Lxc
     # Returns information about given container
     def info(name)
       res = {:state => nil, :pid => nil}
-      info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3).stdout.split("\n")
+      info = run_command("lxc-info -n #{name}", :allow_failure_retry => 3, :sudo => true).stdout.split("\n")
       if(info.first)
         parts = info.first.split(' ')
         res[:state] = parts.last.downcase.to_sym
@@ -270,34 +271,34 @@ class Lxc
   # Start the container
   def start(*args)
     if(args.include?(:no_daemon))
-      run_command("#{sudo}lxc-start -n #{name}")
+      run_command("lxc-start -n #{name}", :sudo => true)
     else
-      run_command("#{sudo}lxc-start -n #{name} -d")
+      run_command("lxc-start -n #{name} -d", :sudo => true)
       wait_for_state(:running)
     end
   end
 
   # Stop the container
   def stop
-    run_command("#{sudo}lxc-stop -n #{name}", :allow_failure_retry => 3)
+    run_command("lxc-stop -n #{name}", :allow_failure_retry => 3, :sudo => true)
     wait_for_state(:stopped)
   end
 
   # Freeze the container
   def freeze
-    run_command("#{sudo}lxc-freeze -n #{name}")
+    run_command("lxc-freeze -n #{name}", :sudo => true)
     wait_for_state(:frozen)
   end
 
   # Unfreeze the container
   def unfreeze
-    run_command("#{sudo}lxc-unfreeze -n #{name}")
+    run_command("lxc-unfreeze -n #{name}", :sudo => true)
     wait_for_state(:running)
   end
 
   # Shutdown the container
   def shutdown
-    run_command("#{sudo}lxc-shutdown -n #{name}")
+    run_command("lxc-shutdown -n #{name}", :sudo => true)
     wait_for_state(:stopped, :timeout => 120)
     # This block is for fedora/centos/anyone else that does not like lxc-shutdown
     if(running?)
@@ -315,7 +316,26 @@ class Lxc
     unless stopped?
       stop
     end
-    run_command("#{sudo}lxc-destroy -n #{name}")
+    run_command("lxc-destroy -n #{name}", :sudo => true)
+  end
+
+  # command:: command string
+  # Execute command string within container
+  def execute(command)
+    if(stopped?)
+      cmd = Shellwords.split(command)
+      result = nil
+      begin
+        run_command("lxc-execute -n #{name} -- /bin/bash -c \"#{command}\"", :sudo => true)
+      rescue => e
+        if(e.result.stderr.downcase.include?('failed to find an lxc-init'))
+          $stderr.puts "ERROR: Missing `lxc-init` installation on container (#{name}). Install lxc-init on container before using `#execute`!"
+        end
+        raise
+      end
+    else
+      raise "Cannot execute against running container (#{name})"
+    end
   end
 
   def direct_container_command(command, args={})
@@ -333,35 +353,7 @@ class Lxc
     end
   end
   alias_method :knife_container, :direct_container_command
-=begin
-  # Simple helper to shell out
-  def run_command(cmd, args={})
-    retries = args[:allow_failure_retry].to_i
-    begin
-      shlout = Mixlib::ShellOut.new(cmd,
-        :logger => defined?(Chef) ? Chef::Log.logger : log,
-        :live_stream => args[:livestream] ? nil : STDOUT,
-        :timeout => args[:timeout] || 1200,
-        :environment => {'HOME' => detect_home}
-      )
-      shlout.run_command
-      shlout.error!
-      shlout
-    rescue Mixlib::ShellOut::ShellCommandFailed, CommandFailed, Mixlib::ShellOut::CommandTimeout
-      if(retries > 0)
-        log.warn "LXC run command failed: #{cmd}"
-        log.warn "Retrying command. #{args[:allow_failure_retry].to_i - retries} of #{args[:allow_failure_retry].to_i} retries remain"
-        sleep(0.3)
-        retries -= 1
-        retry
-      elsif(args[:allow_failure])
-        true
-      else
-        raise
-      end
-    end
-  end
-=end
+
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
     wait_total = 0.0
