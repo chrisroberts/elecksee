@@ -1,4 +1,5 @@
 require 'elecksee/helpers/base'
+require 'securerandom'
 require 'shellwords'
 require 'pathname'
 require 'tmpdir'
@@ -320,13 +321,16 @@ class Lxc
   end
 
   # command:: command string
+  # opts:: option hash (:networking)
   # Execute command string within container
-  def execute(command)
+  def execute(command, opts={})
     if(stopped?)
       cmd = Shellwords.split(command)
       result = nil
       begin
-        run_command("lxc-execute -n #{name} -- /bin/bash -c \"#{command}\"", :sudo => true)
+        tmp_execute_script(command, opts) do |script_path|
+          result = run_command("lxc-execute -n #{name} -- #{script_path}", :sudo => true)
+        end
       rescue => e
         if(e.result.stderr.downcase.include?('failed to find an lxc-init'))
           $stderr.puts "ERROR: Missing `lxc-init` installation on container (#{name}). Install lxc-init on container before using `#execute`!"
@@ -360,6 +364,34 @@ class Lxc
     until(state == desired_state.to_sym || (args[:timeout].to_i > 0 && wait_total.to_i > args[:timeout].to_i))
       sleep(args[:sleep_interval])
       wait_total += args[:sleep_interval]
+    end
+  end
+
+  # command:: command string
+  # Write command to temporary script with networking support wrap
+  def tmp_execute_script(command, opts)
+    script_path = "tmp/#{SecureRandom.uuid}"
+    File.open(rootfs.join(script_path), 'w') do |file|
+      file.puts '#!/bin/sh'
+      unless(opts[:networking] == false)
+        file.write <<-EOS
+/etc/network/if-pre-up.d/bridge > /dev/null 2>&1
+ifdown eth0 > /dev/null 2>&1
+ifup eth0 > /dev/null 2>&1
+EOS
+      end
+      file.puts command
+      file.puts "RESULT=$?"
+      unless(opts[:networking] == false)
+        file.puts "ifdown eth0 > /dev/null 2>&1"
+      end
+      file.puts "exit $RESULT"
+    end
+    FileUtils.chmod(0755, rootfs.join(script_path))
+    begin
+      yield script_path
+    ensure
+      FileUtils.rm(rootfs.join(script_path))
     end
   end
 
