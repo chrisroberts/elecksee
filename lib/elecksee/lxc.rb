@@ -73,7 +73,7 @@ class Lxc
     # name:: Name of container
     # Returns information about given container
     def info(name)
-      info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3)
+      info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3, :allow_failure => true)
       if(info)
         Hash[
           info.stdout.split("\n").map do |string|
