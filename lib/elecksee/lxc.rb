@@ -81,7 +81,7 @@ class Lxc
           end.map do |key, value|
             key = key.tr(' ', '_').downcase.to_sym
             if(key == :state)
-              value = value.to_sym
+              value = value.downcase.to_sym
             elsif(value.to_i.to_s == value)
               value = value.to_i
             end
