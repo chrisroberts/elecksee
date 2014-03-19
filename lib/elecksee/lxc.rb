@@ -394,7 +394,7 @@ EOS
     end
     FileUtils.chmod(0755, rootfs.join(script_path))
     begin
-      yield script_path
+      yield "/#{script_path}"
     ensure
       FileUtils.rm(rootfs.join(script_path))
     end
