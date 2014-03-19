@@ -49,6 +49,7 @@ class Lxc
 
     # Simple helper to shell out
     def run_command(cmd, args={})
+      result = nil
       cmd_type = Lxc.shellout_helper
       unless(cmd_type)
         if(defined?(ChildProcess))
@@ -57,16 +58,18 @@ class Lxc
           cmd_type = :mixlib_shellout
         end
       end
+      com_block = nil
       case cmd_type
       when :childprocess
         require 'tempfile'
-        result = child_process_command(cmd, args)
+        com_block = lambda{ child_process_command(cmd, args) }
       when :mixlib_shellout
         require 'mixlib/shellout'
-        result = mixlib_shellout_command(cmd, args)
+        com_block = lambda{ mixlib_shellout_command(cmd, args) }
       else
         raise ArgumentError.new("Unknown shellout helper provided: #{cmd_type}")
       end
+      result = defined?(Bundler) ? Bundler.with_clean_env{ com_block.call } : com_block.call
       result == false ? false : CommandResult.new(result)
     end
 
