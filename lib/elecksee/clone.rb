@@ -1,12 +1,7 @@
-%w(
-  helpers/base helpers/options helpers/copies lxc
-  storage/overlay_directory storage/overlay_mount
-  storage/virtual_device
-).each do |path|
-  require "elecksee/#{path}"
-end
+require 'elecksee'
 
 class Lxc
+  # Clone existing containers
   class Clone
 
     include Helpers
@@ -25,9 +20,14 @@ class Lxc
     option :gateway, '-G', :string, :desc => 'Custom gateway'
     option :netmask, '-N', :string, :default => '255.255.255.0', :desc => 'Custom netmask'
 
-    # Hash containing original and new container instances
+    # @return [Hash] original and new container instances
     attr_reader :lxcs
 
+    # Create new instance
+    #
+    # @param args [Hash]
+    # @option args [String] :original existing container name
+    # @option args [String] :new new container name
     def initialize(args={})
       configure!(args)
       @lxcs = {}
@@ -37,31 +37,40 @@ class Lxc
       validate!
     end
 
+    # Create the clone
+    #
+    # @return [Lxc] new clone
     def clone!
       begin
         copy_original
         update_naming(:no_config)
         apply_custom_addressing if ipaddress
-        lxcs[:new]
+        lxc
       rescue Exception
         @created.map(&:destroy)
         raise
       end
     end
-    
+
     private
 
     alias_method :name, :new_name
-    
-    # Returns new lxc instance
+
+    # @return [Lxc] new lxc instance
     def lxc
       lxcs[:new]
     end
 
+    # Add to list of created items
+    #
+    # @param thing [Object] item created
     def created(thing)
       @created << thing
     end
 
+    # Validate current state
+    #
+    # @return [TrueClass]
     def validate!
       unless(lxcs[:original].exists?)
         raise "Requested `original` container does not exist (#{original})"
@@ -72,8 +81,12 @@ class Lxc
       if(lxcs[:original].running?)
         raise "Requested `original` container is current running (#{original})"
       end
+      true
     end
 
+    # Create copy of original container
+    #
+    # @return [TrueClass]
     def copy_original
       copy_init
       if(device)
@@ -86,38 +99,56 @@ class Lxc
         rootfs_dir = copy_fs
       end
       update_rootfs(rootfs_dir)
+      true
     end
 
+    # Initialize container copy (base file copy)
+    #
+    # @return [TrueClass]
     def copy_init
-      directory = CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
+      directory = Storage::CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
       created(directory)
       %w(config fstab).each do |file|
         command("cp '#{lxcs[:original].path.join(file)}' '#{directory.target_path}'", :sudo => true)
       end
+      true
     end
 
+    # Copy into file system directory
+    #
+    # @return [String] path to new rootfs
     def copy_fs
-      directory = CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
+      directory = Storage::CloneDirectory.new(lxcs[:new].name, :dir => File.dirname(lxcs[:original].path.to_s))
       created(directory)
       command("rsync -ax '#{lxcs[:original].rootfs}/' '#{File.join(directory.target_path, 'rootfs')}/'", :sudo => true)
       File.join(directory.target_path, 'rootfs')
     end
 
+    # Copy into new virtual block device
+    #
+    # @return [String] path to new rootfs
     def copy_vbd
-      storage = VirtualDevice.new(lxcs[:new].name, :tmp_dir => '/opt/lxc-vbd')
+      storage = Storage::VirtualDevice.new(lxcs[:new].name, :tmp_dir => '/opt/lxc-vbd')
       created(storage)
       command("rsync -ax '#{lxcs[:original].rootfs}/' '#{storage.target_path}/'", :sudo => true)
       storage.target_path
     end
 
+    # Copy into new LVM partition
+    #
+    # @note not implemented
+    # @todo implement
     def copy_lvm
       raise 'Not implemented'
     end
 
+    # Copy into new btrfs subvolume snapshot
+    #
+    # @return [String] path to new rootfs
+    # @todo remove on failure
     def copy_btrfs
       rootfs_path = lxcs[:new].path.join('rootfs')
       command("btrfs subvolume snapshot '#{lxcs[:original].rootfs}' '#{rootfs_path}'", :sudo => true)
-      # TODO: Remove on failure
       rootfs_path
     end
   end

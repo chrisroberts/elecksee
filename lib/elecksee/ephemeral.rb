@@ -1,18 +1,11 @@
+require 'elecksee'
 require 'securerandom'
 require 'fileutils'
 require 'tmpdir'
 require 'etc'
 
-%w(
-  helpers/base helpers/options helpers/copies lxc
-  storage/overlay_directory storage/overlay_mount
-  storage/virtual_device
-).each do |path|
-  require "elecksee/#{path}"
-end
-
 class Lxc
-
+  # Create ephemeral containers
   class Ephemeral
 
     include Helpers
@@ -34,15 +27,27 @@ class Lxc
     option :tmp_dir, '-T', :string, :default => '/tmp/lxc/ephemerals', :aliases => 'tmp-dir', :desc => 'Directory of ephemeral temp files'
     option :ephemeral_command, '-C', :string, :aliases => 'command'
 
+    # @return [String] name of container
     attr_reader :name
+    # @return [TrueClass, FalseClass] enable CLI output
     attr_reader :cli
+    # @return [String] hostname of container
     attr_reader :hostname
+    # @return [String] path to container
     attr_reader :path
+    # @return [Lxc] instance of ephemeral
     attr_reader :lxc
+    # @return [Storage::OverlayDirectory, Storage::VirtualDevice]
     attr_reader :ephemeral_device
+    # @return [Storage::OverlayMount]
     attr_reader :ephemeral_overlay
+    # @return [Array<Storage::VirtualDevice]
     attr_reader :ephemeral_binds
 
+    # Create new instance
+    #
+    # @param args [Hash]
+    # @option args [TrueClass, FalseClass] :cli enable CLI output
     def initialize(args={})
       configure!(args)
       @cli = args[:cli]
@@ -54,19 +59,34 @@ class Lxc
       @lxc = nil
     end
 
+    # Trap signals to force cleanup
+    #
+    # @return [TrueClass]
     def register_traps
       %w(TERM INT QUIT).each do |sig|
         Signal.trap(sig){ cleanup && raise }
       end
+      tue
     end
 
+    # Write output to CLI
+    #
+    # @return [TrueClass, FalseClass]
     def cli_output
       if(cli)
         puts "New ephemeral container started. (#{name})"
         puts "    - Connect using: sudo ssh -i #{ssh_key} root@#{lxc.container_ip(10)}"
+        true
+      else
+        false
       end
     end
 
+    # Start the ephemeral container
+    #
+    # @return [TrueClass]
+    # @note generally should not be called directly
+    # @see start!
     def start_action
       begin
         lxc.start
@@ -83,10 +103,19 @@ class Lxc
       true
     end
 
+    # Create the ephemeral container
+    #
+    # @return [TrueClass]
     def create!
       setup
+      true
     end
 
+    # Start the ephemeral container
+    #
+    # @param args [Symbol] argument list
+    # @return [TrueClass]
+    # @note use :fork to fork startup
     def start!(*args)
       register_traps
       setup
@@ -102,8 +131,12 @@ class Lxc
       else
         start_action
       end
+      true
     end
 
+    # Stop container and cleanup ephemeral items
+    #
+    # @return [TrueClass, FalseClass]
     def cleanup
       lxc.stop
       @ephemeral_overlay.unmount
@@ -120,22 +153,29 @@ class Lxc
 
     private
 
+    # Setup the ephemeral container resources
+    #
+    # @return [TrueClass]
     def setup
       create
       build_overlay
       update_naming
       discover_binds
       apply_custom_networking if ipaddress
+      true
     end
 
+    # Create the overlay
+    #
+    # @return [TrueClass, FalseClass]
     def build_overlay
       if(directory)
-        @ephemeral_device = OverlayDirectory.new(name, :tmp_dir => directory.is_a?(String) ? directory : tmp_dir)
+        @ephemeral_device = Storage::OverlayDirectory.new(name, :tmp_dir => directory.is_a?(String) ? directory : tmp_dir)
       else
-        @ephemeral_device = VirtualDevice.new(name, :size => device, :tmp_fs => !device, :tmp_dir => tmp_dir)
+        @ephemeral_device = Storage::VirtualDevice.new(name, :size => device, :tmp_fs => !device, :tmp_dir => tmp_dir)
         @ephemeral_device.mount
       end
-      @ephemeral_overlay = OverlayMount.new(
+      @ephemeral_overlay = Storage::OverlayMount.new(
         :base => Lxc.new(original).rootfs.to_path,
         :overlay => ephemeral_device.target_path,
         :target => lxc.path.join('rootfs').to_path,
@@ -144,6 +184,9 @@ class Lxc
       @ephemeral_overlay.mount
     end
 
+    # Create the container
+    #
+    # @return [TrueClass]
     def create
       Dir.glob(File.join(lxc_dir, original, '*')).each do |o_path|
         next unless File.file?(o_path)
@@ -152,10 +195,15 @@ class Lxc
       @lxc = Lxc.new(name)
       command("mkdir -p #{lxc.path.join('rootfs')}", :sudo => true)
       update_net_hwaddr
+      true
     end
 
-    # TODO: Discovered binds for ephemeral are all tmpfs for now.
-    # TODO: We should default to overlay mount, make virt dev optional
+    # Discover any bind mounts defined
+    #
+    # @return [TrueClass]
+    # @todo discovered binds for ephemeral are all tmpfs for
+    #   now. should default to overlay mount, make virtual
+    #   device and tmpfs optional
     def discover_binds
       contents = File.readlines(lxc.path.join('fstab')).each do |line|
         parts = line.split(' ')
@@ -163,7 +211,7 @@ class Lxc
           source = parts.first
           target = parts[1].sub(%r{^.+rootfs/}, '')
           container_target = lxc.rootfs.join(target).to_path
-          device = VirtualDevice.new(target.gsub('/', '_'), :tmp_fs => true)
+          device = Storage::VirtualDevice.new(target.gsub('/', '_'), :tmp_fs => true)
           device.mount
           FileUtils.mkdir_p(container_target)
           ephemeral_binds << device
@@ -182,6 +230,8 @@ class Lxc
         contents << "#{bind} #{lxc.rootfs.join(bind)} none bind 0 0\n"
       end
       write_file(lxc.path.join('fstab'), contents.join)
+      true
     end
+
   end
 end

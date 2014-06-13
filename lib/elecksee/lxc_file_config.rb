@@ -1,11 +1,21 @@
+require 'elecksee'
+
 class Lxc
+  # Configuration file interface
   class FileConfig
 
+    # @return [Array]
     attr_reader :network
+    # @return [String] path to configuration file
     attr_reader :base
 
     class << self
 
+      # Convert object to Hash if possible
+      #
+      # @param thing [Object]
+      # @return [Hash]
+      # @note used mostly for the lxc resource within chef
       def convert_to_hash(thing)
         if(defined?(Chef) && thing.is_a?(Chef::Resource))
           result = Hash[*(
@@ -26,6 +36,10 @@ class Lxc
         result || thing
       end
 
+      # Symbolize keys within hash
+      #
+      # @param thing [Hashish]
+      # @return [Hash]
       def symbolize_hash(thing)
         if(defined?(Mash))
           Mash.new(thing)
@@ -38,6 +52,10 @@ class Lxc
         end
       end
 
+      # Generate configuration file contents
+      #
+      # @param resource [Hashish]
+      # @return [String]
       def generate_config(resource)
         resource = symbolize_hash(convert_to_hash(resource))
         config = []
@@ -79,6 +97,9 @@ class Lxc
 
     end
 
+    # Create new instance
+    #
+    # @param path [String]
     def initialize(path)
       raise 'LXC config file not found' unless File.exists?(path)
       @path = path
@@ -89,6 +110,9 @@ class Lxc
 
     private
 
+    # Parse the configuration file
+    #
+    # @return [TrueClass]
     def parse!
       cur_net = nil
       File.readlines(@path).each do |line|
@@ -115,6 +139,8 @@ class Lxc
         end
       end
       @network << cur_net if cur_net
+      true
     end
+
   end
 end

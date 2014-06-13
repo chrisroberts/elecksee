@@ -1,53 +1,26 @@
-require 'shellwords'
+require 'elecksee'
 
 class Lxc
-  class CommandFailed < StandardError
-    attr_accessor :original, :result
-    def initialize(orig, result=nil)
-      @original = orig
-      @result = result
-      super(orig.to_s)
-    end
-  end
-
-  class Timeout < CommandFailed
-  end
-
-  class CommandResult
-    attr_reader :original, :stdout, :stderr
-    def initialize(result)
-      @original = result
-      if(result.class.ancestors.map(&:to_s).include?('ChildProcess::AbstractProcess'))
-        extract_childprocess
-      elsif(result.class.to_s == 'Mixlib::ShellOut')
-        extract_shellout
-      else
-        raise TypeError.new("Unknown process result type received: #{result.class}")
-      end
-    end
-
-    def extract_childprocess
-      original.io.stdout.rewind
-      original.io.stderr.rewind
-      @stdout = original.io.stdout.read
-      @stderr = original.io.stderr.read
-      original.io.stdout.delete
-      original.io.stderr.delete
-    end
-
-    def extract_shellout
-      @stdout = original.stdout
-      @stderr = original.stderr
-    end
-  end
-
+  # Helper modules
   module Helpers
 
+    autoload :Copies, 'elecksee/helpers/copies'
+    autoload :Options, 'elecksee/helpers/options'
+
+    # @return [String] sudo command string
     def sudo
       Lxc.sudo
     end
 
-    # Simple helper to shell out
+    # Shellout wrapper
+    #
+    # @param cmd [String]
+    # @param args [Hash]
+    # @option args [Integer] :allow_failure_retry number of retries
+    # @option args [Numeric] :timeout max execution time
+    # @option args [TrueClass, FalseClass] :sudo use sudo
+    # @option args [TrueClass, FalseClass] :allow_failure don't raise on error
+    # @return [CommandResult]
     def run_command(cmd, args={})
       result = nil
       cmd_type = Lxc.shellout_helper
@@ -73,6 +46,15 @@ class Lxc
       result == false ? false : CommandResult.new(result)
     end
 
+    # Shellout using childprocess
+    #
+    # @param cmd [String]
+    # @param args [Hash]
+    # @option args [Integer] :allow_failure_retry number of retries
+    # @option args [Numeric] :timeout max execution time
+    # @option args [TrueClass, FalseClass] :sudo use sudo
+    # @option args [TrueClass, FalseClass] :allow_failure don't raise on error
+    # @return [ChildProcess::AbstractProcess]
     def child_process_command(cmd, args)
       retries = args[:allow_failure_retry].to_i
       cmd = [sudo, cmd].join(' ') if args[:sudo]
@@ -109,6 +91,15 @@ class Lxc
       end
     end
 
+    # Shellout using mixlib shellout
+    #
+    # @param cmd [String]
+    # @param args [Hash]
+    # @option args [Integer] :allow_failure_retry number of retries
+    # @option args [Numeric] :timeout max execution time
+    # @option args [TrueClass, FalseClass] :sudo use sudo
+    # @option args [TrueClass, FalseClass] :allow_failure don't raise on error
+    # @return [Mixlib::ShellOut]
     def mixlib_shellout_command(cmd, args)
       retries = args[:allow_failure_retry].to_i
       cmd = [sudo, cmd].join(' ') if args[:sudo]
@@ -137,11 +128,9 @@ class Lxc
         end
       end
     end
+    alias_method :run_command, :command
 
-    def command(*args)
-      run_command(*args)
-    end
-
+    # @return [Logger] logger instance
     def log
       if(defined?(Chef))
         Chef::Log
@@ -154,8 +143,11 @@ class Lxc
       end
     end
 
-    # Detect HOME environment variable. If not an acceptable
-    # value, set to /root or /tmp
+    # Detect HOME if environment variable is not set
+    #
+    # @param set_if_missing [TrueClass, FalseClass] set environment variable if missing
+    # @return [String] value detected
+    # @note if detection fails, first writeable path is used from /root or /tmp
     def detect_home(set_if_missing=false)
       if(ENV['HOME'] && Pathname.new(ENV['HOME']).absolute?)
         ENV['HOME']
@@ -166,6 +158,71 @@ class Lxc
         end
         home
       end
+    end
+
+  end
+
+  # Command failure class
+  class CommandFailed < StandardError
+
+    # @return [StandardError] original exception
+    attr_accessor :original
+    # @return [Object] command result
+    attr_accessor :result
+
+    # Create new instance
+    #
+    # @param orig [StandardError] original exception
+    # @param result [Object] command result
+    def initialize(orig, result=nil)
+      @original = orig
+      @result = result
+      super(orig.to_s)
+    end
+  end
+
+  # Command exceeded timeout
+  class Timeout < CommandFailed
+  end
+
+  # Result of command
+  class CommandResult
+
+    # @return [Object] original result
+    attr_reader :original
+    # @return [IO] stdout of command
+    attr_reader :stdout
+    # @return [IO] stderr of command
+    attr_reader :stderr
+
+    # Create new instance
+    #
+    # @param result [Object] result of command
+    def initialize(result)
+      @original = result
+      if(result.class.ancestors.map(&:to_s).include?('ChildProcess::AbstractProcess'))
+        extract_childprocess
+      elsif(result.class.to_s == 'Mixlib::ShellOut')
+        extract_shellout
+      else
+        raise TypeError.new("Unknown process result type received: #{result.class}")
+      end
+    end
+
+    # Extract information from childprocess result
+    def extract_childprocess
+      original.io.stdout.rewind
+      original.io.stderr.rewind
+      @stdout = original.io.stdout.read
+      @stderr = original.io.stderr.read
+      original.io.stdout.delete
+      original.io.stderr.delete
+    end
+
+    # Extract information from mixlib shellout result
+    def extract_shellout
+      @stdout = original.stdout
+      @stderr = original.stderr
     end
   end
 end
