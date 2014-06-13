@@ -1,5 +1,4 @@
 require 'elecksee/version'
-require 'elecksee/lxc'
 
 # LXC interface
 class Lxc
@@ -11,3 +10,5 @@ class Lxc
   autoload :CommandResult, 'elecksee/helpers'
   autoload :Storage, 'elecksee/storage'
 end
+
+require 'elecksee/lxc'
