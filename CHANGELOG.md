@@ -1,3 +1,11 @@
+## v1.1.0
+* Update all documentation to yardoc
+* Group classes into logical namespaces
+* Define expected returns for methods
+* Remove calls to lxc-shutdown (not always available)
+* Always attempt in container halt prior to lxc-stop
+* Use lxc-ls for container listing to prevent permission issues
+
 ## v1.0.22
 * Update underlying implementation for execute
 * Provide better info interpretation
