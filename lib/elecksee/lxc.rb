@@ -63,11 +63,8 @@ class Lxc
 
     # List of containers
     def list
-      Dir.glob(File.join(base_path, '*')).map do |item|
-        if(File.directory?(item) && File.exists?(File.join(item, 'config')))
-          File.basename(item)
-        end
-      end.compact
+      run_command('lxc-ls', :sudo => true).
+        stdout.split(/\s/).map(&:strip).compact
     end
 
     # name:: Name of container
@@ -304,15 +301,17 @@ class Lxc
 
   # Shutdown the container
   def shutdown
-    run_command("lxc-shutdown -n #{name}", :sudo => true)
-    wait_for_state(:stopped, :timeout => 120)
     # This block is for fedora/centos/anyone else that does not like lxc-shutdown
     if(running?)
       container_command('shutdown -h now')
       wait_for_state(:stopped, :timeout => 120)
       # If still running here, something is wrong
       if(running?)
-        raise "Failed to shutdown container: #{name}"
+        run_command("lxc-stop -n #{name}", :sudo => true)
+        wait_for_state(:stopped, :timeout => 120)
+        if(running?)
+          raise "Failed to shutdown container: #{name}"
+        end
       end
     end
   end
