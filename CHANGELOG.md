@@ -1,3 +1,8 @@
+## v1.0.22
+* Update underlying implementation for execute
+* Provide better info interpretation
+* Scrub bundler environment variables if found
+
 ## v1.0.20
 * Fix `LxcFileConfig` population when using `Chef::Resource` instance
 
