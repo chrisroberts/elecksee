@@ -128,7 +128,7 @@ class Lxc
         end
       end
     end
-    alias_method :run_command, :command
+    alias_method :command, :run_command
 
     # @return [Logger] logger instance
     def log
