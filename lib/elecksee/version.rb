@@ -1,3 +1,3 @@
 module Elecksee
-  VERSION = Gem::Version.new('1.0.22')
+  VERSION = Gem::Version.new('1.0.23')
 end
