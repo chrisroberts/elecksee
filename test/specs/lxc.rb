@@ -131,7 +131,7 @@ describe Lxc do
 
     describe 'Running commands' do
       it 'should allow commands executed within it' do
-        lxc.container_command('ls /').stdout.must_include '/tmp'
+        lxc.container_command('ls /').stdout.must_include 'tmp'
       end
     end
   end

@@ -11,6 +11,6 @@ Gem::Specification.new do |s|
   s.require_path = 'lib'
   s.executables = %w(lxc-awesome-ephemeral)
   s.add_dependency 'mixlib-shellout'
-  s.add_dependency 'net-ssh'
+  s.add_dependency 'rye'
   s.files = Dir['**/*']
 end

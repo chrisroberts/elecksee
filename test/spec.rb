@@ -12,6 +12,8 @@ Kernel.at_exit do
   puts "DONE!"
 end
 
+Lxc.default_ssh_password = 'fubar'
+
 require 'minitest/autorun'
 
 # Setup some containers for testing
@@ -20,6 +22,9 @@ unless(system('sudo lxc-ls | grep "^elecksee-tester$" > /dev/null 2>&1'))
   unless(system('sudo lxc-create -n elecksee-tester -t ubuntu -- -r precise > /dev/null 2>&1'))
     raise 'Failed to create base testing container'
   end
+end
+unless(system('echo root:fubar | sudo chpasswd -R /var/lib/lxc/elecksee-tester/rootfs '))
+  raise 'Failed to set base testing container password'
 end
 4.times do |i|
   unless(system("sudo lxc-clone elecksee-tester elecksee-tester-#{i} > /dev/null 2>&1"))

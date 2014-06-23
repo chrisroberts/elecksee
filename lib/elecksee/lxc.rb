@@ -3,6 +3,7 @@ require 'securerandom'
 require 'shellwords'
 require 'pathname'
 require 'tmpdir'
+require 'rye'
 
 class Lxc
 
@@ -29,6 +30,12 @@ class Lxc
   attr_reader :lease_file
   # @return [String] network device to use for ssh connection
   attr_reader :preferred_device
+  # @return [String, NilClass] path to default ssh key
+  attr_accessor :ssh_key
+  # @return [String, NilClass] ssh password
+  attr_accessor :ssh_password
+  # @return [String, NilClass]  ssh user
+  attr_accessor :ssh_user
 
   class << self
 
@@ -40,6 +47,12 @@ class Lxc
     attr_accessor :base_path
     # @return [Symbol] :mixlib_shellout or :childprocess
     attr_accessor :shellout_helper
+    # @return [String, NilClass] path to default ssh key
+    attr_accessor :default_ssh_key
+    # @return [String, NilClass] default ssh password
+    attr_accessor :default_ssh_password
+    # @return [String, NilClass] default ssh user
+    attr_accessor :default_ssh_user
 
     # @return [String] sudo command
     def sudo
@@ -148,11 +161,17 @@ class Lxc
   # @option args [String] :base_path path to container
   # @option args [String] :dnsmasq_lease_file path to lease file
   # @option args [String] :net_device network device within container for ssh connection
+  # @option args [String] :ssh_key path to ssh key
+  # @option args [String] :ssh_password ssh password
+  # @option args [String] :ssh_user ssh user
   def initialize(name, args={})
     @name = name
     @base_path = args[:base_path] || self.class.base_path
     @lease_file = args[:dnsmasq_lease_file] || '/var/lib/misc/dnsmasq.leases'
     @preferred_device = args[:net_device]
+    @ssh_key = args.fetch(:ssh_key, self.class.default_ssh_key)
+    @ssh_password = args.fetch(:ssh_password, self.class.default_ssh_password)
+    @ssh_user = args.fetch(:ssh_user, self.class.default_ssh_user)
   end
 
   # @return [TrueClass, FalseClass] container exists
@@ -434,16 +453,25 @@ class Lxc
   # @return [CommandResult]
   def direct_container_command(command, args={})
     begin
-      run_command(
-        "ssh root@#{args[:ip] || container_ip} -i /opt/hw-lxc-config/id_rsa -oStrictHostKeyChecking=no '#{command}'",
-        :sudo => true,
-        :timeout => args[:timeout],
-        :live_stream => args[:live_stream]
+      box = Rye::Box.new(
+        args.fetch(:ip, container_ip),
+        :user => ssh_user,
+        :password => ssh_password,
+        :password_prompt => false,
+        :keys => [ssh_key],
+        :safe => false
       )
-      true
-    rescue
-      raise if args[:raise_on_failure]
-      false
+      result = box.execute command
+      CommandResult.new(result)
+    rescue Rye::Err => e
+      if(args[:raise_on_failure])
+        raise CommandFailed.new(
+          "Command failed: #{command}",
+          CommandResult.new(e)
+        )
+      else
+        false
+      end
     end
   end
   alias_method :knife_container, :direct_container_command
@@ -529,5 +557,7 @@ EOS
 
 end
 
-# Default shell out helper to mixlib
+# Make default settings
 Lxc.shellout_helper = :mixlib_shellout
+Lxc.default_ssh_key = '/opt/hw-lxc-config/id_rsa'
+Lxc.default_ssh_user = 'root'

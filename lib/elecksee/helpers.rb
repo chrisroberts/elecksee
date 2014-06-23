@@ -204,6 +204,8 @@ class Lxc
         extract_childprocess
       elsif(result.class.to_s == 'Mixlib::ShellOut')
         extract_shellout
+      elsif(result.class.to_s == 'Rye::Err' || result.class.to_s == 'Rye::Rap')
+        extract_rye
       else
         raise TypeError.new("Unknown process result type received: #{result.class}")
       end
@@ -224,5 +226,12 @@ class Lxc
       @stdout = original.stdout
       @stderr = original.stderr
     end
+
+    # Extract information from rye result
+    def extract_rye
+      @stdout = original.stdout.map(&:to_s)
+      @stderr = original.stderr.map(&:to_s)
+    end
+
   end
 end
