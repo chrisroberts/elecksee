@@ -229,8 +229,8 @@ class Lxc
 
     # Extract information from rye result
     def extract_rye
-      @stdout = original.stdout.map(&:to_s)
-      @stderr = original.stderr.map(&:to_s)
+      @stdout = original.stdout.map(&:to_s).join("\n")
+      @stderr = original.stderr.map(&:to_s).join("\n")
     end
 
   end
