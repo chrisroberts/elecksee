@@ -86,8 +86,8 @@ describe Lxc do
         lxc.exists?.must_equal true
       end
       it 'should have an IP adddress' do
-        lxc.container_ip(3).must_be_kind_of String
-        lxc.container_ip(3).wont_be_empty
+        lxc.container_ip(5).must_be_kind_of String
+        lxc.container_ip.wont_be_empty
       end
       it 'should return running state' do
         lxc.state.must_equal :running
@@ -130,8 +130,12 @@ describe Lxc do
     end
 
     describe 'Running commands' do
+      before do
+        lxc.wait_for_state(:running)
+      end
+
       it 'should allow commands executed within it' do
-        lxc.container_command('ls /').stdout.must_include 'tmp'
+        lxc.container_command('ls /').stdout.split("\n").must_include 'tmp'
       end
     end
   end
@@ -143,8 +147,8 @@ describe Lxc do
     let(:lxc){ @lxc }
 
     it 'should allow commands executed within it' do
-      flunk 'current issues with cgroup'
-      lxc.execute('ls').stdout.must_include '/tmp'
+      #flunk 'current issues with cgroup'
+      lxc.execute('ls').stdout.split("\n").must_include 'tmp'
     end
   end
 
