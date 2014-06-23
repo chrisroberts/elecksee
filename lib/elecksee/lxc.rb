@@ -202,7 +202,11 @@ class Lxc
   # @note retries are executed on 3 second sleep intervals
   def container_ip(retries=0, raise_on_fail=false)
     (retries.to_i + 1).times do
-      ip = proc_detected_address || hw_detected_address || leased_address || lxc_stored_address
+      ip = info_detected_address ||
+        proc_detected_address ||
+        hw_detected_address ||
+        leased_address ||
+        lxc_stored_address
       if(ip.is_a?(Array))
         # Filter any found loopbacks
         ip.delete_if{|info| info[:device].start_with?('lo') }
@@ -258,6 +262,13 @@ class Lxc
       log.info "LXC Discovery: Found container address via DHCP lease: #{ip}"
       ip
     end
+  end
+
+  # Container address discovered via info
+  #
+  # @return [String, NilClass] IP address
+  def info_detected_address
+    self.class.info(name)[:ip]
   end
 
   # Container address discovered via device
@@ -454,7 +465,7 @@ class Lxc
   def direct_container_command(command, args={})
     begin
       box = Rye::Box.new(
-        args.fetch(:ip, container_ip),
+        args.fetch(:ip, container_ip(3)),
         :user => ssh_user,
         :password => ssh_password,
         :password_prompt => false,
