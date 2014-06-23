@@ -26,6 +26,9 @@ end
 unless(system('echo root:fubar | sudo chpasswd -R /var/lib/lxc/elecksee-tester/rootfs '))
   raise 'Failed to set base testing container password'
 end
+unless(system('sudo chroot /var/lib/lxc/elecksee-tester/rootfs apt-get install --no-install-recommends -qq -y lxc'))
+  raise 'Failed to install nested lxc package'
+end
 4.times do |i|
   unless(system("sudo lxc-clone elecksee-tester elecksee-tester-#{i} > /dev/null 2>&1"))
     raise "Failed to create tester clone (interval #{i})"
