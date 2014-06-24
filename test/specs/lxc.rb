@@ -130,10 +130,6 @@ describe Lxc do
     end
 
     describe 'Running commands' do
-      before do
-        lxc.wait_for_state(:running)
-      end
-
       it 'should allow commands executed within it' do
         lxc.container_command('ls /').stdout.split("\n").must_include 'tmp'
       end
@@ -147,8 +143,29 @@ describe Lxc do
     let(:lxc){ @lxc }
 
     it 'should allow commands executed within it' do
-      #flunk 'current issues with cgroup'
       lxc.execute('ls').stdout.split("\n").must_include 'tmp'
+    end
+  end
+
+  describe 'State waiter' do
+    before do
+      @lxc = Lxc.new('elecksee-tester-3')
+    end
+    let(:lxc){ @lxc }
+
+    describe 'when stopped' do
+      before do
+        lxc.stop
+        Thread.new do
+          sleep(0.5)
+          Lxc.new('elecksee-tester-3').start
+        end
+      end
+
+      it 'should wait for running state' do
+        lxc.wait_for_state(:running)
+        lxc.running?.must_equal true
+      end
     end
   end
 
