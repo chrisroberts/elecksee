@@ -66,7 +66,7 @@ class Lxc
       %w(TERM INT QUIT).each do |sig|
         Signal.trap(sig){ cleanup && raise }
       end
-      tue
+      true
     end
 
     # Write output to CLI
