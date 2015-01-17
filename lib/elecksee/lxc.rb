@@ -472,7 +472,8 @@ class Lxc
         :password => ssh_password,
         :password_prompt => false,
         :keys => [ssh_key],
-        :safe => false
+        :safe => false,
+        :paranoid => false
       )
       result = box.execute command
       CommandResult.new(result)
