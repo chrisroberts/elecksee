@@ -2,7 +2,6 @@ require 'elecksee'
 require 'childprocess'
 
 Lxc.default_ssh_password = 'fubar'
-Lxc.shellout_helper = :childprocess
 
 # Register our exit callback prior to loading minitest so
 # our callback is executed after the tests are completed

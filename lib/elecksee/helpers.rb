@@ -23,14 +23,7 @@ class Lxc
     # @return [CommandResult]
     def run_command(cmd, args={})
       result = nil
-      cmd_type = Lxc.shellout_helper
-      unless(cmd_type)
-        if(defined?(ChildProcess))
-          cmd_type = :childprocess
-        else
-          cmd_type = :mixlib_shellout
-        end
-      end
+      cmd_type = :childprocess
       com_block = nil
       case cmd_type
       when :childprocess

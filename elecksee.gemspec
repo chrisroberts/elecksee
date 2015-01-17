@@ -10,7 +10,7 @@ Gem::Specification.new do |s|
   s.description = 'LXC helpers'
   s.require_path = 'lib'
   s.executables = %w(lxc-awesome-ephemeral)
-  s.add_dependency 'mixlib-shellout'
+  s.add_dependency 'childprocess'
   s.add_dependency 'rye'
   s.files = Dir['**/*']
 end
