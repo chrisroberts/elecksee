@@ -111,7 +111,9 @@ class Lxc
     # @param name [String] name of container
     # @return [Hash]
     def info(name)
-      info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3, :allow_failure => true)
+      if(exists?(name))
+        info = run_command("#{sudo}lxc-info -n #{name}", :allow_failure_retry => 3, :allow_failure => true)
+      end
       if(info)
         Hash[
           info.stdout.split("\n").map do |string|
