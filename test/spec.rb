@@ -1,4 +1,8 @@
 require 'elecksee'
+require 'childprocess'
+
+Lxc.default_ssh_password = 'fubar'
+Lxc.shellout_helper = :childprocess
 
 # Register our exit callback prior to loading minitest so
 # our callback is executed after the tests are completed
@@ -12,8 +16,6 @@ Kernel.at_exit do
   puts "DONE!"
 end
 
-Lxc.default_ssh_password = 'fubar'
-
 require 'minitest/autorun'
 
 # Setup some containers for testing
@@ -23,14 +25,17 @@ unless(system('sudo lxc-ls | grep "^elecksee-tester$" > /dev/null 2>&1'))
     raise 'Failed to create base testing container'
   end
 end
-unless(system('echo root:fubar | sudo chpasswd -R /var/lib/lxc/elecksee-tester/rootfs '))
+unless(system('echo root:fubar | sudo chroot /var/lib/lxc/elecksee-tester/rootfs chpasswd'))
   raise 'Failed to set base testing container password'
 end
-unless(system('sudo chroot /var/lib/lxc/elecksee-tester/rootfs apt-get install --no-install-recommends -qq -y lxc'))
-  raise 'Failed to install nested lxc package'
+system('sudo cp /etc/resolv.conf /var/lib/lxc/elecksee-tester/rootfs/etc/resolv.conf')
+unless(system('sudo chroot /var/lib/lxc/elecksee-tester/rootfs apt-get -qq update > /dev/null 2>&1'))
+  raise 'Failed update local apt repo cache'
 end
+system('sudo bash -c \'echo "USE_LXC_BRIDGE=false" > /var/lib/lxc/elecksee-tester/rootfs/etc/default/lxc\'')
+system('sudo chroot /var/lib/lxc/elecksee-tester/rootfs apt-get install lxc --no-install-recommends -y -q --force-yes -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confnew" > /dev/null 2>&1')
 4.times do |i|
-  unless(system("sudo lxc-clone elecksee-tester elecksee-tester-#{i} > /dev/null 2>&1"))
+  unless(system("sudo lxc-clone -o elecksee-tester -n elecksee-tester-#{i} > /dev/null 2>&1"))
     raise "Failed to create tester clone (interval #{i})"
   end
   unless(system("sudo lxc-start -d -n elecksee-tester-#{i} > /dev/null 2>&1"))
