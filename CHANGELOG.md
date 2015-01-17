@@ -5,6 +5,8 @@
 * Remove calls to lxc-shutdown (not always available)
 * Always attempt in container halt prior to lxc-stop
 * Use lxc-ls for container listing to prevent permission issues
+* Use the Rye library under the hood for container connects
+* Use ChildProcess for shelling out
 
 ## v1.0.22
 * Update underlying implementation for execute

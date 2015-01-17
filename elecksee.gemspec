@@ -12,5 +12,5 @@ Gem::Specification.new do |s|
   s.executables = %w(lxc-awesome-ephemeral)
   s.add_dependency 'childprocess'
   s.add_dependency 'rye'
-  s.files = Dir['**/*']
+  s.files = Dir['{bin,lib}/**/**/*'] + %w(elecksee.gemspec README.md CHANGELOG.md LICENSE CONTRIBUTING.md)
 end
