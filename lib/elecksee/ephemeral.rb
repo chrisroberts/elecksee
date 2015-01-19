@@ -134,6 +134,51 @@ class Lxc
       true
     end
 
+    # Bash based wrapper script to start ephemeral and clean up
+    # ephemeral resources on exit
+    def shell_wrapper
+      content = ['#!/bin/bash']
+      content << 'trap "" SIGTERM SIGINT SIGQUIT'
+      content << "#{sudo} lxc-start -n #{lxc.name}"
+      ephemeral_binds.map do |bind|
+        unless(bind.device_path == :none)
+          if(File.file?(bind.device_path))
+            content << "rm #{bind.device_path}"
+          elsif(File.directory?(bind.device_path))
+            content << "rm -rf #{bind.device_path}"
+          end
+        end
+        unless(bind.mount_path == :none)
+          if(File.directory?(bind.mount_path))
+            content << "rmdir #{bind.mount_path}"
+          end
+        end
+      end
+      case ephemeral_device
+      when Storage::OverlayDirectory
+        if(File.directory?(ephemeral_device.overlay_path))
+          content << "#{sudo} rm -rf #{ephemeral_device.overlay_path}"
+        end
+      when Storage::VirtualDevice
+        if(ephemeral_device.mounted?)
+          content << "#{sudo} umount #{ephemeral.mount_path}"
+        end
+        unless(ephemeral_device.device_path == :none)
+          if(File.file?(ephemeral_device.device_path))
+            content << "rm #{ephemeral_device.device_path}"
+          elsif(File.directory?(ephemeral_device.device_path))
+            content << "rm -rf #{ephemeral_device.device_path}"
+          end
+        end
+        unless(ephemeral_device.mount_path == :none)
+          if(File.directory?(ephemeral_device.mount_path))
+            content << "rmdir #{ephemeral_device.mount_path}"
+          end
+        end
+      end
+      # Write tmp file for execute
+    end
+
     # Stop container and cleanup ephemeral items
     #
     # @return [TrueClass, FalseClass]
