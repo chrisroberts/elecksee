@@ -456,6 +456,20 @@ class Lxc
     end
   end
 
+  # Provide connection to running container
+  #
+  # @return [Rye::Box]
+  def connection(args={})
+    Rye::Box.new(args.fetch(:ip, container_ip(3)),
+      :user => ssh_user,
+      :password => ssh_password,
+      :password_prompt => false,
+      :keys => [ssh_key],
+      :safe => false,
+      :paranoid => false
+    )
+  end
+
   # Execute command within running container
   #
   # @param command [String]
@@ -466,16 +480,7 @@ class Lxc
   # @return [CommandResult]
   def direct_container_command(command, args={})
     begin
-      box = Rye::Box.new(
-        args.fetch(:ip, container_ip(3)),
-        :user => ssh_user,
-        :password => ssh_password,
-        :password_prompt => false,
-        :keys => [ssh_key],
-        :safe => false,
-        :paranoid => false
-      )
-      result = box.execute command
+      result = connection(args).execute command
       CommandResult.new(result)
     rescue Rye::Err => e
       if(args[:raise_on_failure])
@@ -571,7 +576,5 @@ EOS
 
 end
 
-# Make default settings
-Lxc.shellout_helper = :mixlib_shellout
 Lxc.default_ssh_key = '/opt/hw-lxc-config/id_rsa'
 Lxc.default_ssh_user = 'root'
