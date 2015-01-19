@@ -2,6 +2,7 @@ require 'elecksee'
 require 'securerandom'
 require 'fileutils'
 require 'tmpdir'
+require 'tempfile'
 require 'etc'
 
 class Lxc
@@ -117,18 +118,26 @@ class Lxc
     # @return [TrueClass]
     # @note use :fork to fork startup
     def start!(*args)
-      register_traps
       setup
       if(daemon)
         if(args.include?(:fork))
+          register_traps
           fork do
             start_action
           end
+        elsif(args.include?(:detach))
+          cmd = [sudo, shell_wrapper.path].compact.map(&:strip)
+          process = ChildProcess.build(*cmd)
+          process.detach = true
+          process.start
+          shell_wrapper.delete
         else
+          register_traps
           Process.daemon
           start_action
         end
       else
+        register_traps
         start_action
       end
       true
@@ -136,10 +145,12 @@ class Lxc
 
     # Bash based wrapper script to start ephemeral and clean up
     # ephemeral resources on exit
+    #
+    # @return [Tempfile] wrapper script
     def shell_wrapper
       content = ['#!/bin/bash']
-      content << 'trap "" SIGTERM SIGINT SIGQUIT'
-      content << "#{sudo} lxc-start -n #{lxc.name}"
+      content << 'scrub()' << '{'
+      content << "umount #{ephemeral_overlay.target}"
       ephemeral_binds.map do |bind|
         unless(bind.device_path == :none)
           if(File.file?(bind.device_path))
@@ -157,11 +168,11 @@ class Lxc
       case ephemeral_device
       when Storage::OverlayDirectory
         if(File.directory?(ephemeral_device.overlay_path))
-          content << "#{sudo} rm -rf #{ephemeral_device.overlay_path}"
+          content << "rm -rf #{ephemeral_device.overlay_path}"
         end
       when Storage::VirtualDevice
         if(ephemeral_device.mounted?)
-          content << "#{sudo} umount #{ephemeral.mount_path}"
+          content << "umount #{ephemeral_device.mount_path}"
         end
         unless(ephemeral_device.device_path == :none)
           if(File.file?(ephemeral_device.device_path))
@@ -176,7 +187,20 @@ class Lxc
           end
         end
       end
-      # Write tmp file for execute
+      if(lxc.path.to_path.split('/').size > 1)
+        content << "rm -rf #{lxc.path.to_path}"
+      end
+      content << '}'
+      content << 'trap scrub SIGTERM SIGINT SIGQUIT'
+      content << "lxc-start -n #{lxc.name} -d"
+      content << 'sleep 1'
+      content << "lxc-wait -n #{lxc.name} -s STOPPED"
+      content << 'scrub'
+      tmp = Tempfile.new('elecksee')
+      tmp.chmod(0700)
+      tmp.puts content.join("\n")
+      tmp.close
+      tmp
     end
 
     # Stop container and cleanup ephemeral items
