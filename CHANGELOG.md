@@ -1,3 +1,7 @@
+## v1.1.2
+* Provide direct access to `Rye::Box`
+* Add alternate ephemeral init using bash wrapper for cleanup
+
 ## v1.1.0
 * Update all documentation to yardoc
 * Group classes into logical namespaces
