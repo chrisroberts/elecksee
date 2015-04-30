@@ -207,7 +207,7 @@ class Lxc
     #
     # @return [TrueClass, FalseClass]
     def cleanup
-      lxc.stop
+      lxc.stop if lxc.running?
       @ephemeral_overlay.unmount
       @ephemeral_binds.map(&:destroy)
       @ephemeral_device.destroy
