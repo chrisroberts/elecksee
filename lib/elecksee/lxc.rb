@@ -53,6 +53,8 @@ class Lxc
     attr_accessor :default_ssh_password
     # @return [String, NilClass] default ssh user
     attr_accessor :default_ssh_user
+    # @return [Symbol] default command method
+    attr_accessor :container_command_via
 
     # @return [String] sudo command
     def sudo
@@ -479,18 +481,25 @@ class Lxc
   # @option args [TrueClass, FalseClass] :raise_on_failure
   # @return [CommandResult]
   def direct_container_command(command, args={})
-    begin
-      result = connection(args).execute command
-      CommandResult.new(result)
-    rescue Rye::Err => e
-      if(args[:raise_on_failure])
-        raise CommandFailed.new(
-          "Command failed: #{command}",
-          CommandResult.new(e)
-        )
-      else
-        false
+    if(args.fetch(:run_as, Lxc.container_command_via).to_sym == :ssh)
+      begin
+        result = connection(args).execute command
+        CommandResult.new(result)
+      rescue Rye::Err => e
+        if(args[:raise_on_failure])
+          raise CommandFailed.new(
+            "Command failed: #{command}",
+            CommandResult.new(e)
+          )
+        else
+          false
+        end
       end
+    else
+      command(
+        "lxc-attach -n #{name} #{command}",
+        args.merge(:sudo => true)
+      )
     end
   end
   alias_method :knife_container, :direct_container_command
@@ -576,5 +585,9 @@ EOS
 
 end
 
-Lxc.default_ssh_key = '/opt/hw-lxc-config/id_rsa'
+Lxc.default_ssh_key = [
+  File.join(Dir.home, '.ssh', 'lxc_container_rsa'),
+  '/opt/hw-lxc-config/id_rsa',
+].detect{|key| File.exists?(key) }
 Lxc.default_ssh_user = 'root'
+Lxc.container_command_via = :ssh
