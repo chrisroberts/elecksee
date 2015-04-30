@@ -1,3 +1,7 @@
+## v1.1.4
+* Only stop container on cleanup if container is running
+* Add flag for selection of using ssh or attach to run commands
+
 ## v1.1.2
 * Provide direct access to `Rye::Box`
 * Add alternate ephemeral init using bash wrapper for cleanup
