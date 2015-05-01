@@ -1,3 +1,7 @@
+## v1.1.6
+* Check for unknown state when stopping (ephemerals final state is :unknown)
+* Force Rye to proxy method_missing correctly on free form commands
+
 ## v1.1.4
 * Only stop container on cleanup if container is running
 * Add flag for selection of using ssh or attach to run commands
