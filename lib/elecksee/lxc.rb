@@ -380,7 +380,7 @@ class Lxc
   # @return [self]
   def stop
     run_command("lxc-stop -n #{name}", :allow_failure_retry => 3, :sudo => true)
-    wait_for_state(:stopped)
+    wait_for_state([:stopped, :unknown])
     self
   end
 
@@ -506,7 +506,7 @@ class Lxc
 
   # Wait for container to reach given state
   #
-  # @param desired_state [Symbol]
+  # @param desired_state [Symbol, Array<Symbol>]
   # @param args [Hash]
   # @option args [Integer] :timeout
   # @option args [Numeric] :sleep_interval
@@ -514,7 +514,8 @@ class Lxc
   def wait_for_state(desired_state, args={})
     args[:sleep_interval] ||= 1.0
     wait_total = 0.0
-    until(state == desired_state.to_sym || (args[:timeout].to_i > 0 && wait_total.to_i > args[:timeout].to_i))
+    desired_state = [desired_state].flatten.compact.map(&:to_sym)
+    until(desired_state.include?(state) || (args[:timeout].to_i > 0 && wait_total.to_i > args[:timeout].to_i))
       sleep(args[:sleep_interval])
       wait_total += args[:sleep_interval]
     end
