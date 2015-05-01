@@ -591,3 +591,10 @@ Lxc.default_ssh_key = [
 ].detect{|key| File.exists?(key) }
 Lxc.default_ssh_user = 'root'
 Lxc.container_command_via = :ssh
+
+# Monkey
+class Rye::Box
+  def execute(*args, &block)
+    method_missing(*args, &block)
+  end
+end
