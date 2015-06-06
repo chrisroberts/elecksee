@@ -371,6 +371,11 @@ class Lxc
     else
       run_command("lxc-start -n #{name} -d", :sudo => true)
       wait_for_state(:running)
+      run_command(
+        "lxc-attach -n #{name} -- init 5",
+        :sudo => true,
+        :allow_failure => true
+      )
     end
     self
   end
