@@ -79,7 +79,7 @@ class Lxc
         if(resource[:cap_drop])
           config << "lxc.cap.drop = #{Array(resource[:cap_drop]).join(' ')}"
         end
-        %w(pts tty arch devttydir mount mount_entry rootfs rootfs_mount pivotdir).each do |k|
+        %w(include pts tty arch devttydir mount mount_entry rootfs rootfs_mount pivotdir).each do |k|
           config << "lxc.#{k.sub('_', '.')} = #{resource[k.to_sym]}" if resource[k.to_sym]
         end
         prefix = 'lxc.cgroup'
