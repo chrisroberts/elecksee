@@ -1,3 +1,6 @@
+## v1.1.8
+* Add `include` support for file config
+
 ## v1.1.6
 * Check for unknown state when stopping (ephemerals final state is :unknown)
 * Force Rye to proxy method_missing correctly on free form commands
