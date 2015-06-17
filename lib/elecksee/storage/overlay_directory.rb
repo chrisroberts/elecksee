@@ -34,7 +34,7 @@ class Lxc
       # @return [TrueClass, FalseClass]
       def create
         unless(File.directory?(overlay_path))
-          FileUtils.mkdir_p(overlay_path)
+          command("mkdir -p #{overlay_path}", :sudo => true)
           true
         else
           false
