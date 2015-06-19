@@ -29,7 +29,7 @@ class Lxc
     # @return [String] path to config file
     attr_reader :path
     # @return [AttrubuteStruct] config file contents
-    attr_reader :state
+    attr_accessor :state
 
     # Create new instance
     #
