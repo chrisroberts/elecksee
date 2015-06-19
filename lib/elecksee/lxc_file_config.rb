@@ -1,13 +1,9 @@
 require 'elecksee'
+require 'attribute_struct'
 
 class Lxc
   # Configuration file interface
   class FileConfig
-
-    # @return [Array]
-    attr_reader :network
-    # @return [String] path to configuration file
-    attr_reader :base
 
     class << self
 
@@ -97,50 +93,92 @@ class Lxc
 
     end
 
+    # @return [String] path to config file
+    attr_reader :path
+    # @return [AttrubuteStruct] config file contents
+    attr_reader :state
+
     # Create new instance
     #
     # @param path [String]
     def initialize(path)
       raise 'LXC config file not found' unless File.exists?(path)
       @path = path
-      @network = []
-      @base = defined?(Mash) ? Mash.new : {}
       parse!
+    end
+
+    # @return [Smash] hash like dump of state
+    def state_hash
+      state._dump.to_smash
+    end
+
+    # Overwrite the config file
+    #
+    # @return [Integer]
+    def write!
+      File.write(path, generate_content)
+    end
+
+    # Generate config file content from current value of state
+    #
+    # @return [String]
+    def generate_content
+      process_item(state_hash).flatten.join("\n")
     end
 
     private
 
+    def process_item(item, parents=[])
+      case item
+      when Hash
+        item.map do |k,v|
+          process_item(v, parents + [k])
+        end
+      when Array
+        item.map do |v|
+          process_item(v, parents)
+        end
+      else
+        "#{parents.join('.')} = #{item}"
+      end
+    end
+
     # Parse the configuration file
     #
-    # @return [TrueClass]
+    # @return [AttributeStruct]
     def parse!
-      cur_net = nil
-      File.readlines(@path).each do |line|
-        if(line.start_with?('lxc.network'))
-          parts = line.split('=')
-          name = parts.first.split('.').last.strip
-          if(name.to_sym == :type)
-            @network << cur_net if cur_net
-            cur_net = Mash.new
-          end
-          if(cur_net)
-            cur_net[name] = parts.last.strip
-          else
-            raise "Expecting 'lxc.network.type' to start network config block. Found: 'lxc.network.#{name}'"
-          end
-        else
-          parts = line.split('=')
-          name = parts.first.sub('lxc.', '').strip
-          if(@base[name])
-            @base[name] = [@base[name], parts.last.strip].flatten
-          else
-            @base[name] = parts.last
-          end
-        end
+      struct = LxcStruct.new
+      struct._set_state(:value_collapse => true)
+      File.read(path).split("\n").each do |line|
+        parts = line.split('=').map(&:strip)
+        parts.last.replace("'#{parts.last}'")
+        struct.instance_eval(parts.join(' = '))
       end
-      @network << cur_net if cur_net
-      true
+      @state = struct
     end
 
   end
+end
+
+class LxcStruct < AttributeStruct
+
+  def network(*args, &block)
+    unless(self[:network])
+      set!(:network, ::AttributeStruct::CollapseArray.new)
+      self[:network].push(_klass_new)
+    end
+    if(self[:network].last._data[:type].is_a?(::AttributeStruct::CollapseArray))
+      val = self[:network].last._data[:type].pop
+      self[:network].push(_klass_new)
+      self[:network].last.set!(:type, val)
+      $stdout.puts '!' * 20
+    end
+    $stdout.puts "CUR: #{_data} - #{self[:network]} - #{self[:network].last._data}"
+    self[:network].last
+  end
+
+  def _klass
+    ::LxcStruct
+  end
+
 end
