@@ -171,9 +171,7 @@ class LxcStruct < AttributeStruct
       val = self[:network].last._data[:type].pop
       self[:network].push(_klass_new)
       self[:network].last.set!(:type, val)
-      $stdout.puts '!' * 20
     end
-    $stdout.puts "CUR: #{_data} - #{self[:network]} - #{self[:network].last._data}"
     self[:network].last
   end
 
