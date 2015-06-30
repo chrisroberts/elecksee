@@ -93,7 +93,7 @@ class Lxc
         lxc.start
         if(ephemeral_command)
           lxc.wait_for_state(:running)
-          lxc.container_command(ephemeral_command)
+          lxc.container_command(ephemeral_command, 0) # no retries on ephemeral commands
         else
           cli_output
           lxc.wait_for_state(:stopped)
