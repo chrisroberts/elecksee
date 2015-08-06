@@ -1,4 +1,5 @@
 require 'elecksee/version'
+require 'bogo'
 
 # LXC interface
 class Lxc
