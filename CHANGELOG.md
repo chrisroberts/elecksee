@@ -1,3 +1,10 @@
+## v2.0.0
+* [fix] Use sudo helper when cloning
+* [enhancement] Disable retry on ephemeral command
+* [enhancement] Dynamic parsing/generation of configuration files
+
+_WARNING: Updated configuration file handling may cause breakage_
+
 ## v1.1.8
 * Add `include` support for file config
 
