@@ -194,7 +194,9 @@ class Lxc
       content << 'trap scrub SIGTERM SIGINT SIGQUIT'
       content << "lxc-start -n #{lxc.name} -d"
       content << 'sleep 1'
-      content << "lxc-wait -n #{lxc.name} -s STOPPED"
+      content << 'until [ `lxc-wait -n #{lxc.name} -s STOPPED -t 2` ]'
+      content << 'do'
+      content << 'done'
       content << 'scrub'
       tmp = Tempfile.new('elecksee')
       tmp.chmod(0700)
