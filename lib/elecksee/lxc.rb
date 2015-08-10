@@ -496,10 +496,9 @@ class Lxc
         end
       end
     else
-      command(
-        "lxc-attach -n #{name} -- #{command}",
-        args.merge(:sudo => true)
-      )
+      tmp_execute_script(command, :networking => false) do |script_path|
+        command("lxc-attach -n #{name} -- #{script_path}", args.merge(:sudo => true))
+      end
     end
   end
   alias_method :knife_container, :direct_container_command
