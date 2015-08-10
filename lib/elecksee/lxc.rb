@@ -497,7 +497,7 @@ class Lxc
       end
     else
       command(
-        "lxc-attach -n #{name} #{command}",
+        "lxc-attach -n #{name} -- #{command}",
         args.merge(:sudo => true)
       )
     end
@@ -591,7 +591,7 @@ Lxc.default_ssh_key = [
   '/opt/hw-lxc-config/id_rsa',
 ].detect{|key| File.exists?(key) }
 Lxc.default_ssh_user = 'root'
-Lxc.container_command_via = :ssh
+Lxc.container_command_via = :attach
 
 # Monkey
 class Rye::Box
