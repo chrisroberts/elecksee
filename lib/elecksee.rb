@@ -16,4 +16,4 @@ end
 require 'elecksee/lxc'
 require 'childprocess'
 
-ChildProcess.posix_spawn = true
+ChildProcess.posix_spawn = false
