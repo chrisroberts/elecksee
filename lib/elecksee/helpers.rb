@@ -4,6 +4,10 @@ class Lxc
   # Helper modules
   module Helpers
 
+    class << self
+      attr_accessor :child_process_lock
+    end
+
     autoload :Copies, 'elecksee/helpers/copies'
     autoload :Options, 'elecksee/helpers/options'
 
@@ -56,11 +60,14 @@ class Lxc
         s_err = Tempfile.new('stderr')
         s_out.sync
         s_err.sync
-        c_proc = ChildProcess.build(*Shellwords.split(cmd))
-        c_proc.environment.merge('HOME' => detect_home)
-        c_proc.io.stdout = s_out
-        c_proc.io.stderr = s_err
-        c_proc.start
+        c_proc = nil
+        Lxc::Helpers.child_process_lock.synchronize do
+          c_proc = ChildProcess.build(*Shellwords.split(cmd))
+          c_proc.environment.merge('HOME' => detect_home)
+          c_proc.io.stdout = s_out
+          c_proc.io.stderr = s_err
+          c_proc.start
+        end
         begin
           c_proc.poll_for_exit(args[:timeout] || 1200)
         rescue ChildProcess::TimeoutError
@@ -228,3 +235,5 @@ class Lxc
 
   end
 end
+
+Lxc::Helpers.child_process_lock = Mutex.new
