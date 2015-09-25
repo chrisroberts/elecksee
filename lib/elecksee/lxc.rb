@@ -497,7 +497,7 @@ class Lxc
       end
     else
       tmp_execute_script(command, :networking => false) do |script_path|
-        command("lxc-attach -n #{name} -- #{script_path}", args.merge(:sudo => true))
+        command("lxc-attach --clear-env -n #{name} -- #{script_path}", args.merge(:sudo => true))
       end
     end
   end
