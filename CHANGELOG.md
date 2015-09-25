@@ -2,6 +2,8 @@
 * [fix] Use sudo helper when cloning
 * [enhancement] Disable retry on ephemeral command
 * [enhancement] Dynamic parsing/generation of configuration files
+* [fix] Do not register traps when executing inline
+* [fix] Synchronize childprocess access to prevent race
 
 _WARNING: Updated configuration file handling may cause breakage_
 
