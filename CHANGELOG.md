@@ -1,3 +1,6 @@
+## v2.0.4
+* Always scrub environment variables prior to execution on attach
+
 ## v2.0.2
 * Disable spawn by default
 * Use attach by default
