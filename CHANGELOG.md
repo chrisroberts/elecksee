@@ -1,3 +1,8 @@
+## v2.0.2
+* Disable spawn by default
+* Use attach by default
+* Fix typing issue around string manipulations
+
 ## v2.0.0
 * [fix] Use sudo helper when cloning
 * [enhancement] Disable retry on ephemeral command
