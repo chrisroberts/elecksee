@@ -137,7 +137,6 @@ class Lxc
           start_action
         end
       else
-        register_traps
         start_action
       end
       true
