@@ -10,9 +10,10 @@ class Lxc
   autoload :Timeout,'elecksee/helpers'
   autoload :CommandResult, 'elecksee/helpers'
   autoload :Storage, 'elecksee/storage'
+  autoload :FileConfig, 'elecksee/lxc_file_config'
 end
 
 require 'elecksee/lxc'
 require 'childprocess'
 
-ChildProcess.posix_spawn = true
+ChildProcess.posix_spawn = false

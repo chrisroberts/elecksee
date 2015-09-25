@@ -496,10 +496,9 @@ class Lxc
         end
       end
     else
-      command(
-        "lxc-attach -n #{name} #{command}",
-        args.merge(:sudo => true)
-      )
+      tmp_execute_script(command, :networking => false) do |script_path|
+        command("lxc-attach -n #{name} -- #{script_path}", args.merge(:sudo => true))
+      end
     end
   end
   alias_method :knife_container, :direct_container_command
@@ -591,7 +590,7 @@ Lxc.default_ssh_key = [
   '/opt/hw-lxc-config/id_rsa',
 ].detect{|key| File.exists?(key) }
 Lxc.default_ssh_user = 'root'
-Lxc.container_command_via = :ssh
+Lxc.container_command_via = :attach
 
 # Monkey
 class Rye::Box

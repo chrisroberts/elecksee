@@ -92,7 +92,7 @@ class Lxc
       struct._set_state(:value_collapse => true)
       File.read(path).split("\n").each do |line|
         parts = line.split('=').map(&:strip)
-        parts.last.replace("'#{parts.last}'")
+        parts.last.to_s.replace("'#{parts.last}'")
         struct.instance_eval(parts.join(' = '))
       end
       @state = struct
