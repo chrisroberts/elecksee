@@ -179,6 +179,10 @@ class Lxc
       @result = result
       super(orig.to_s)
     end
+
+    def to_s
+      "#{super} - STDERR: #{result.stderr}"
+    end
   end
 
   # Command exceeded timeout
